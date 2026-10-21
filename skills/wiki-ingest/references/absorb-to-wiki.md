@@ -79,7 +79,7 @@ Path as type: `concepts/`, `entities/`, `summaries/`.
 
 Language: wiki pages follow the user's language; filenames are kebab-case.
 
-Mixed Chinese-English: keep the English when removing it loses information for the reader — technical terms (first occurrence as 「中文译名」（English term）, Chinese thereafter) and original quotations (Chinese first, original language in parentheses). Everything else in Chinese.
+Mixed-language text, for a wiki not written in English: keep the English when removing it loses information for the reader — technical terms (first occurrence as translated term (English term), the translation thereafter) and original quotations (translation first, original language in parentheses). Everything else in the wiki's language.
 
 The first body section is always `## Overview`: one coherent paragraph stating the core thesis and conclusion. Cross-reference with `[[wiki-link]]` after that, written until globally unique: the basename when it is unique, otherwise the full path from the project root. Intermediate segments take no part in matching, so a partial path neither disambiguates nor raises an error.
 
