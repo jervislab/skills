@@ -81,7 +81,7 @@ Language: wiki pages follow the user's language; filenames are kebab-case.
 
 Mixed Chinese-English: keep the English when removing it loses information for the reader — technical terms (first occurrence as 「中文译名」（English term）, Chinese thereafter) and original quotations (Chinese first, original language in parentheses). Everything else in Chinese.
 
-Header image (`wiki/images/`) is optional and generated only on explicit user request — invoke the visual-design skill + /references/jp-lifestyle-editorial-illustration.md, placed after the frontmatter and before `## Overview`. The first body section is always `## Overview`: one coherent paragraph stating the core thesis and conclusion. Cross-reference with `[[wiki-link]]` after that, written until globally unique: the basename when it is unique, otherwise the full path from the project root. Intermediate segments take no part in matching, so a partial path neither disambiguates nor raises an error.
+The first body section is always `## Overview`: one coherent paragraph stating the core thesis and conclusion. Cross-reference with `[[wiki-link]]` after that, written until globally unique: the basename when it is unique, otherwise the full path from the project root. Intermediate segments take no part in matching, so a partial path neither disambiguates nor raises an error.
 
 Section naming: a section that only lists links is `## Related`; a section that explains in prose how the page differs from and complements adjacent concepts is `## Adjacent Concepts`. Use one or the other, never both.
 

@@ -135,7 +135,7 @@ class Index:
 
     def shortest_form(self, rel: str) -> str:
         """稳定命中 rel 的最短写法。basename 全局唯一就用 basename,否则只有从仓库根
-        算起的完整路径管用 —— 中间层级不参与匹配,`[[entities/alice]]` 和 `[[alice]]`
+        算起的完整路径管用 —— 中间层级不参与匹配,`[[entities/jervis]]` 和 `[[jervis]]`
         走的是同一条兜底,补一半路径既没消歧也没报错。"""
         key = norm(rel)
         name = Path(key).name

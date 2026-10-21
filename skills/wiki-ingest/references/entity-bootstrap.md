@@ -1,98 +1,98 @@
 # Entity Bootstrap
 
-用 AskUserQuestion 引导用户建立人物或组织的 entity 页面。适用于 wiki bootstrap 阶段的锚点实体创建，也适用于日常 ingest 中遇到值得独立建页的实体。
+Guide the user through AskUserQuestion to build an entity page for a person or organization. Applies to the anchor entity created during wiki bootstrap, and to any entity met during everyday ingest that deserves its own page.
 
-## 何时触发
+## When to Trigger
 
-1. Bootstrap Phase 2 创建锚点实体页时
-2. Single Mode ingest 素材中出现值得独立建页的人物或组织
-3. 用户主动要求创建实体页
+1. Bootstrap Phase 2, when creating the anchor entity page
+2. Single Mode ingest, when the source surfaces a person or organization worth a standalone page
+3. The user asks for an entity page
 
-## 深层捕捉原则
+## Deep Capture Principles
 
-entity 页面是 wiki 知识网络的锚点节点，页面中每个条目应当是推理触发器而非标签。
+Entity pages are the anchor nodes of the wiki's knowledge network. Every entry on the page should be a reasoning trigger, not a label.
 
-不住相：记录生成结构，不记录生成物。schema 的每个字段是推理引擎的燃料。
+Record the generating structure, not what it generates. Each schema field is fuel for the reasoning engine.
 
-深度审计：写入前问两个问题——(1) 能否在更深一层表述？如果能，当前表述是「相」，改写到更深层。(2) 删掉后能否从其他字段推导？如果能，不写入。过不了审计的条目要么改写要么删除。
+Depth audit: before writing an entry, ask two questions. (1) Can it be stated one layer deeper? If so, the current statement is surface; rewrite it at the deeper layer. (2) Could it be derived from other fields if deleted? If so, leave it out. An entry that fails the audit is rewritten or removed.
 
-写入判定：该信号是否会改变 agent 在未来消费这个实体页时的推理行为。能改变的才值得写，不能的留在 refs/ 原始素材里按需回溯。
+Write test: does the signal change how an agent will reason when it later consumes this entity page? Only signals that do are worth writing; the rest stay in the raw material in refs/ for lookup on demand.
 
-## Ask 流程
+## Ask Flow
 
-用 AskUserQuestion 分轮收集。根据第一轮的实体类型分支后续问题。
+Collect in rounds with AskUserQuestion. Branch the later rounds on the entity type chosen in Round 1.
 
-### Round 1: 定位
+### Round 1: Orientation
 
-1. entity type：人物 / 组织
-2. existing material：关于这个实体，你手头有什么现成材料？（多选：已有文档或笔记 / 有公开资料可抓取 / 从记忆描述 / Other）
+1. entity type: person / organization
+2. existing material: what material on this entity do you already have? (multi-select: existing documents or notes / public information to capture / description from memory / Other)
 
-### Round 2: 人物内核
+### Round 2: Personality Kernel
 
-If Round 1 = 人物。同心圆模型：内圈是驱动力、矛盾等生成结构；外圈是姓名、位置等社会坐标。Round 2 只采集内圈。
+If Round 1 = person. Concentric model: the inner circle holds generating structures such as drives and contradictions; the outer circle holds social coordinates such as name and position. Round 2 collects only the inner circle.
 
-1. personality kernel：用一段话描述这个人最本质的特点——什么驱动 ta，身上有什么矛盾之处，ta 有能力做但选择不做的事是什么？（自由输入。提示：不只列标签，尽量说清驱动力之间的关系）
-2. vision & expertise：在追求什么长期方向？专业背景和核心能力是什么？（自由输入）
+1. personality kernel: in one paragraph, describe what is most essential about this person. What drives them, what contradictions do they carry, and what are they capable of but choose not to do? (free input. Hint: go beyond labels and explain how the drives relate to each other)
+2. vision & expertise: what long-term direction are they pursuing? What is their professional background and core ability? (free input)
 
-### Round 2: 组织内核
+### Round 2: Organization Kernel
 
-If Round 1 = 组织。
+If Round 1 = organization.
 
-1. positioning：这个组织做什么，解决什么问题？（自由输入）
-2. core competence：竞争力来自哪里？（自由输入）
-3. key people & tension：谁是关键人物？组织面临的核心矛盾或两难是什么？（自由输入）
+1. positioning: what does this organization do, and what problem does it solve? (free input)
+2. core competence: where does its competitive strength come from? (free input)
+3. key people & tension: who are the key people? What core contradiction or dilemma does the organization face? (free input)
 
-### Round 3: 补充（Optional）
+### Round 3: Supplement (Optional)
 
-Agent 判断信息量足够支撑深度页面时追问。人物和组织均适用。
+Ask when the agent judges the information can support a deeper page. Applies to both people and organizations.
 
-1. leverage：ta/它 拥有哪些让 ta/它 比多数同类有更多选项的能力或资源？（自由输入。信息获取、跨境能力、社会资本、专业底座、组织架构优势等均可）
+1. leverage: what abilities or resources give them more options than most of their peers? (free input. Information access, cross-border reach, social capital, a professional foundation, organizational structure, and the like all count)
 
-## 抽取原则
+## Extraction Principles
 
-从用户回答中分离三类生成层信号：
+Separate three kinds of generating-layer signal from the user's answers:
 
-- drive：行为的根本动机，不只列出驱动力，要说清它们之间的生成关系。区别于 vision（声明的方向）
-- tension：不可消解的结构性矛盾。准入：两个真实的力持续拉扯，无法选择一边。排除：职业轨迹叙事、普遍人性、可从其他字段推导的行为模式
-- constraint：观察到的行为边界。Agent 消费时绕过局限、尊重克制
+- drive: the root motive behind behavior. Explain the generative relationships between drives, not just a list of them. Distinct from vision (the declared direction)
+- tension: an irreducible structural contradiction. Admitted when two real forces pull against each other persistently and neither side can be chosen. Excluded: career-path narrative, universal human nature, behavior patterns derivable from other fields
+- constraint: an observed boundary of behavior. When consuming the page, the agent works around limitations and respects restraint
 
-操作层信号（interests、preferences）有对话 rapport 价值但不承担身份认知功能——删掉它们不应降低模型对实体本性的理解深度。
+Operational signals (interests, preferences) have value for conversational rapport but carry no identity function; deleting them should not reduce the model's understanding of what the entity fundamentally is.
 
-## 页面结构
+## Page Structure
 
-产出写入 `wiki/entities/<name>.md`，遵循 absorb-to-wiki 页面规范。
+Write the output to `wiki/entities/<name>.md`, following the absorb-to-wiki page conventions. Headings follow the wiki's language.
 
 ```markdown
 ---
-name: [实体名]
-description: 一行说清这个实体在知识网络中的角色与最关键的辨识特征
+name: [Entity name]
+description: One line on the entity's role in the knowledge network and its most distinguishing trait
 source: user input
 last_updated: YYYY-MM-DD
 ---
 
 ## Overview
 
-gestalt 入口。1-2 句写结构化字段无法传达的整体质感，不重复内核各维度的内容——那些维度在下方自己说话。接着从内核写到坐标：人物先写驱动力，再交代专业背景和社会位置；组织先写定位和核心能力，再交代规模和关键人物。
+The gestalt entry point. One or two sentences on the overall texture that structured fields cannot convey, without repeating the kernel dimensions, which speak for themselves below. Then move from kernel to coordinates: for a person, drives first, then professional background and social position; for an organization, positioning and core competence first, then scale and key people.
 
-## 人格内核 / 组织内核
+## Personality Kernel / Organization Kernel
 
-drive、tension、constraint 的自然语言展开。不用列表罗列字段，用连贯的段落讲清楚内在逻辑。每个条目是推理触发器：读完后模型能推断行为模式，而不只是知道一个属性。
+drive, tension, and constraint unfolded in natural language. Explain the inner logic in connected paragraphs rather than listing fields. Each entry is a reasoning trigger: after reading it, the model can infer behavior patterns, not just know an attribute.
 
-## 专业坐标 / 核心能力
+## Expertise / Core Competence
 
-expertise、leverage。
+expertise, leverage.
 
-## 方向
+## Direction
 
-vision 和当前阶段。
+vision and current stage.
 
 ## Related
 
-[[wiki-link]] 到 wiki 中的相关页面。
+[[wiki-link]] to related pages in the wiki.
 ```
 
-## 与 wiki-ingest 的协作
+## Working with wiki-ingest
 
-entity-bootstrap 产出的页面是 wiki 知识网络的锚点节点。后续 ingest 素材时，涉及已有实体的新事实通过 Fuse 步骤补充进实体页，不重建。实体页的 Overview 段落随认知加深而修订，内核描述只在用户主动校正时更新。
+Pages produced by entity-bootstrap are anchor nodes of the wiki's knowledge network. When later ingests touch an existing entity, new facts are added to its page through the Fuse step; the page is not rebuilt. The Overview paragraph is revised as understanding deepens; the kernel description changes only when the user corrects it.
 
-生成层字段（drive/tension/constraint）的后续更新需通过深度审计：新信号必须比已有描述更深一层，或覆盖已有描述未捕捉的独立维度。坐标层字段可随新素材自由补充。
+Later updates to generating-layer fields (drive / tension / constraint) must pass the depth audit: a new signal must go one layer deeper than the existing description, or cover an independent dimension it has not captured. Coordinate-layer fields can be supplemented freely as new material arrives.
