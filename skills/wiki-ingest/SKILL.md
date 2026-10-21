@@ -75,6 +75,12 @@ Guards against wiki rot at edit time, not in a later cleanup. `scripts/wiki-lint
 
 On invocation, run `--all` and fix what it reports. Then surface what no script can judge — stale claims, `[[concept]]` pages that should exist, fillable data gaps — as a list for the user to decide.
 
+## JERVIS Sync
+
+Optional. `scripts/sync.py` reports the vault's structure to a JERVIS Dashboard: the vault's name and path, and a tree of file and folder names with each one's fill state. Page content never leaves the machine. Until `sync.py connect <endpoint> <token>` has run, every sync command is a silent no-op.
+
+Scaffold wires `sync.py --hook` into PostToolUse beside wiki-lint and reports once. A vault scaffolded before that has neither: once connected, add the same hook entry to its `.claude/settings.json` (the shape scaffold-wiki.sh writes), then run `sync.py push <vault>` once.
+
 ## Source Routing
 
 | Input | First Step |

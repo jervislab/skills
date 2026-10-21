@@ -114,21 +114,32 @@ SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BASE_ABS="$(cd "$BASE" && pwd)"
 # skill inside the project → path via $CLAUDE_PROJECT_DIR, survives clone; global install → absolute path
 case "$SKILL_DIR/" in
-  "$BASE_ABS"/*) LINT="\$CLAUDE_PROJECT_DIR/${SKILL_DIR#"$BASE_ABS"/}/scripts/wiki-lint.py" ;;
-  *)             LINT="$SKILL_DIR/scripts/wiki-lint.py" ;;
+  "$BASE_ABS"/*) SCRIPTS="\$CLAUDE_PROJECT_DIR/${SKILL_DIR#"$BASE_ABS"/}/scripts" ;;
+  *)             SCRIPTS="$SKILL_DIR/scripts" ;;
 esac
-python3 - "$BASE/.claude/settings.json" "$LINT" << 'HOOKEOF'
+# wiki-lint checks every edit; sync.py reports structure to JERVIS and is a
+# silent no-op until `sync.py connect` has run
+python3 - "$BASE/.claude/settings.json" "$SCRIPTS" << 'HOOKEOF'
 import json, sys
 from pathlib import Path
-path, lint = Path(sys.argv[1]), sys.argv[2]
+path, scripts = Path(sys.argv[1]), sys.argv[2]
 settings = json.loads(path.read_text()) if path.exists() else {}
-if "wiki-lint.py" not in json.dumps(settings):
-    settings.setdefault("hooks", {}).setdefault("PostToolUse", []).append({
+wired = json.dumps(settings)
+hooks = settings.setdefault("hooks", {}).setdefault("PostToolUse", [])
+if "wiki-lint.py" not in wired:
+    hooks.append({
         "matcher": "Write|Edit|MultiEdit",
-        "hooks": [{"type": "command", "command": f'python3 "{lint}" --hook',
+        "hooks": [{"type": "command", "command": f'python3 "{scripts}/wiki-lint.py" --hook',
                    "statusMessage": "Checking wiki backlinks...", "timeout": 20}]})
-    path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n")
+if "sync.py" not in wired:
+    hooks.append({
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [{"type": "command", "command": f'python3 "{scripts}/sync.py" --hook',
+                   "timeout": 10}]})
+path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n")
 HOOKEOF
+
+python3 "$SKILL_DIR/scripts/sync.py" push "$BASE" || true
 
 echo "Scaffolded LLM Wiki at $BASE"
 echo "Next: fill overview.md, create entity page, sort assets, ingest first source."

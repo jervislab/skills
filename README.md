@@ -30,10 +30,16 @@ wiki/log.md            ingest log
 wiki/overview.md       system overview
 glossary.md            project terms (skipped if present)
 inbox.md               friction ledger (skipped if present)
-.claude/settings.json  adds a PostToolUse hook that runs wiki-lint on edits (skipped if already wired)
+.claude/settings.json  PostToolUse hooks: wiki-lint and JERVIS sync on edits (each skipped if already wired)
 ```
 
-It also appends a Wiki Layer section to your project's `AGENTS.md`. The scripts need `python3` and make no network calls. Everything stays in your folder.
+It also appends a Wiki Layer section to your project's `AGENTS.md`. The scripts need `python3`.
+
+### JERVIS sync (optional)
+
+`scripts/sync.py` reports your vault's structure to a [JERVIS](https://jervislab.ai) Dashboard. It is off until you run `sync.py connect <endpoint> <token>` with a token from your Dashboard; before that, no script makes a network call.
+
+Once connected, it sends the vault's name and path and a tree of file and folder names, each marked missing, skeleton, or filled. It never sends page content. Credentials live in `~/.jervis/sync.json`. Delete that file to disconnect.
 
 ## License
 
