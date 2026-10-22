@@ -56,7 +56,9 @@ After the script finishes, the agent initializes the system:
    - Executable scripts → scripts/; reusable templates and tool configs → utils/ (create on demand)
    - List a suggested ingest order (foundational, highly connected material first)
 
-4. Initialize the capability layer: when Ask produced a clear capability plan, create a skeleton directory for each capability (SKILL.md frontmatter plus an empty references/). Content comes in later iterations.
+4. Initialize the capability layer: when Ask produced a clear capability plan, create a skeleton directory for each capability (SKILL.md frontmatter, carrying the Own Skills mark from SKILL.md, plus an empty references/). Content comes in later iterations.
+
+5. Judge existing skills: for each skill already in `.claude/skills/` or `.agents/skills/` without the Own Skills mark, decide whether it is the user's own by the rule in SKILL.md, asking when unclear, and mark only those that are.
 
 Once Phase 2 is done, the system is ready to run. Material goes through the normal wiki-ingest flow; capabilities iterate with skill-creator.
 

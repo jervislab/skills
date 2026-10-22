@@ -64,16 +64,13 @@ LAYOUT = [
         ],
     },
     # The user's skills, where Claude Code reads them and other agents read
-    # .agents/skills; one node per skill
+    # .agents/skills; one node per skill, marked own where the agent judged so
     {"name": ".claude/skills", "kind": "directory", "aliases": [".agents/skills"], "shallow": True},
     # Written by hand or imported, as a Claude Design export
     {"name": "DESIGN.md", "kind": "file", "aliases": ["design-system"]},
     {"name": "scripts", "kind": "directory"},
 ]
 
-# Skills installed from a registry are recorded here; any other skill is the
-# user's own
-SKILLS_LOCK = "skills-lock.json"
 SKILLS_SLOT = ".claude/skills"
 
 FRONTMATTER = re.compile(r"^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)")
@@ -178,16 +175,32 @@ def scan_level(directory, expected, list_all, parent_id, root, descend=True):
     return nodes
 
 
-def mark_installed(nodes, vault: Path):
-    lock = vault / SKILLS_LOCK
-    if not lock.is_file():
-        return nodes
-    installed = set(json.loads(lock.read_text(encoding="utf-8")).get("skills", {}))
+# A skill the user made with their agent says so in its SKILL.md frontmatter,
+# written by the agent once it has judged where the skill came from:
+#   metadata:
+#     origin: own
+# Anything unmarked, installed or not yet judged, is not the user's own.
+OWN_MARK = re.compile(
+    r"^metadata:[ \t]*(?:\n[ \t]+.*)*?\n[ \t]+origin:[ \t]*[\"']?own[\"']?[ \t]*$"
+    r"|^metadata:[ \t]*\{[^}]*\borigin:[ \t]*[\"']?own\b",
+    re.M,
+)
+
+
+def is_own(skill: Path) -> bool:
+    manifest = skill / "SKILL.md"
+    if not manifest.is_file():
+        return False
+    frontmatter = FRONTMATTER.match(manifest.read_text(encoding="utf-8", errors="replace"))
+    return bool(frontmatter and OWN_MARK.search(frontmatter.group(0)))
+
+
+def mark_own(nodes, vault: Path):
     for node in nodes:
         if node.get("slot", node["id"]) == SKILLS_SLOT:
             for skill in node.get("children", []):
-                if skill["name"] in installed:
-                    skill["installed"] = True
+                if is_own(vault / skill["id"]):
+                    skill["own"] = True
     return nodes
 
 
@@ -220,7 +233,7 @@ def display_path(vault: Path) -> str:
 
 def scan(vault: Path):
     root = display_path(vault)
-    nodes = mark_installed(scan_level(vault, LAYOUT, False, "", root), vault)
+    nodes = mark_own(scan_level(vault, LAYOUT, False, "", root), vault)
     return root, mark_orphans(nodes, orphans_of(vault))
 
 
