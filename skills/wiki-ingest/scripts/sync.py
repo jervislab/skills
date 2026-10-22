@@ -36,14 +36,20 @@ STATE = Path.home() / ".jervis" / "last-push.json"
 THROTTLE_SECONDS = 60
 TIMEOUT_SECONDS = 5
 
-# What wiki-ingest scaffolds plus scripts/, in the vault's reading order. Must
-# match the Dashboard's browser scan so both read the same states.
+# What wiki-ingest scaffolds, grouped by the milestone that tracks each slot:
+# the harness, then the know-how, then tools. Must match the Dashboard's
+# browser scan so both read the same states.
+#   aliases     other paths that fill the slot when the expected one is absent;
+#               a path, since listings skip hidden folders
+#   repository  a git repository, filled once it holds a commit
+#   expand      list everything inside, at every depth
+#   shallow     list what is directly inside, each entry read as a whole
 LAYOUT = [
     {"name": "AGENTS.md", "kind": "file", "aliases": ["CLAUDE.md"]},
     {"name": "glossary.md", "kind": "file"},
     {"name": "inbox.md", "kind": "file"},
-    {"name": "scripts", "kind": "directory"},
     {"name": "refs", "kind": "directory"},
+    {"name": ".git", "kind": "directory", "repository": True},
     {
         "name": "wiki",
         "kind": "directory",
@@ -57,16 +63,51 @@ LAYOUT = [
             {"name": "summaries", "kind": "directory"},
         ],
     },
+    # The user's skills, where Claude Code reads them and other agents read
+    # .agents/skills; one node per skill
+    {"name": ".claude/skills", "kind": "directory", "aliases": [".agents/skills"], "shallow": True},
+    # Written by hand or imported, as a Claude Design export
+    {"name": "DESIGN.md", "kind": "file", "aliases": ["design-system"]},
+    {"name": "scripts", "kind": "directory"},
 ]
+
+# Skills installed from a registry are recorded here; any other skill is the
+# user's own
+SKILLS_LOCK = "skills-lock.json"
+SKILLS_SLOT = ".claude/skills"
 
 FRONTMATTER = re.compile(r"^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)")
 
 
+# A page is filled once it has a body: the scaffold writes frontmatter only, so
+# any body text is content. Any other file is filled once it holds anything.
 def file_state(path: Path) -> str:
     if path.suffix != ".md":
         return "filled" if path.stat().st_size > 0 else "skeleton"
     text = path.read_text(encoding="utf-8", errors="replace")
     return "filled" if FRONTMATTER.sub("", text, count=1).strip() else "skeleton"
+
+
+# Filled once the repository holds a commit: HEAD names a commit or a branch
+# that exists. A .git file is a worktree's pointer into a repository with history
+def repository_state(entry: Path) -> str:
+    if entry.is_file():
+        return "filled"
+    head = entry / "HEAD"
+    if not head.is_file():
+        return "skeleton"
+    ref = head.read_text(encoding="utf-8").strip()
+    if not ref.startswith("ref: "):
+        return "filled"
+    branch = ref[len("ref: "):]
+    if (entry / branch).is_file():
+        return "filled"
+    packed = entry / "packed-refs"
+    if packed.is_file() and any(
+        line.endswith(" " + branch) for line in packed.read_text(encoding="utf-8").splitlines()
+    ):
+        return "filled"
+    return "skeleton"
 
 
 def visible(directory: Path):
@@ -84,7 +125,16 @@ def holds_content(directory: Path) -> bool:
     return False
 
 
-def scan_level(directory, expected, list_all, parent_id, root):
+# A slot below a hidden folder is reached by its path, since listings skip
+# hidden entries
+def locate(directory, present, path):
+    if "/" not in path and not path.startswith("."):
+        return present.get(path)
+    entry = directory / path if directory else None
+    return entry if entry and entry.exists() else None
+
+
+def scan_level(directory, expected, list_all, parent_id, root, descend=True):
     present = {entry.name: entry for entry in visible(directory)} if directory else {}
     specs = {spec["name"]: spec for spec in expected}
     if list_all:
@@ -94,24 +144,33 @@ def scan_level(directory, expected, list_all, parent_id, root):
 
     nodes = []
     for spec in ordered:
-        if spec["name"] not in present:
-            alias = next((name for name in spec.get("aliases", []) if name in present), None)
-            if alias:
-                spec = {**spec, "name": alias}
-        node_id = f"{parent_id}/{spec['name']}" if parent_id else spec["name"]
-        node = {"id": node_id, "name": spec["name"], "path": f"{root}/{node_id}"}
-        if spec["kind"] == "directory":
+        # A present alias stands in for an absent expected name, under its own
+        location, entry = spec["name"], None
+        for candidate in [spec["name"], *spec.get("aliases", [])]:
+            entry = locate(directory, present, candidate)
+            if entry:
+                location = candidate
+                break
+        node_id = f"{parent_id}/{location}" if parent_id else location
+        node = {"id": node_id, "name": location.split("/")[-1], "path": f"{root}/{node_id}"}
+        if location != spec["name"]:
+            node["slot"] = spec["name"]
+        # What is found decides how it reads: a slot may be filled by a file or
+        # by a folder, as a design system is
+        if entry.is_dir() if entry else spec["kind"] == "directory":
             node["folder"] = True
-        entry = present.get(spec["name"])
-        kind_matches = entry is not None and (entry.is_dir() if spec["kind"] == "directory" else entry.is_file())
-        if not kind_matches:
+        if entry is None:
             nodes.append({**node, "state": "missing"})
+        elif spec.get("repository"):
+            nodes.append({**node, "state": repository_state(entry)})
         elif entry.is_file():
             nodes.append({**node, "state": file_state(entry)})
-        elif not (spec.get("expand") or list_all):
+        elif not (spec.get("expand") or spec.get("shallow") or (list_all and descend)):
             nodes.append({**node, "state": "filled" if holds_content(entry) else "skeleton"})
         else:
-            children = scan_level(entry, spec.get("children", []), True, node_id, root)
+            children = scan_level(
+                entry, spec.get("children", []), True, node_id, root, descend=not spec.get("shallow")
+            )
             node["state"] = "filled" if any(c["state"] == "filled" for c in children) else "skeleton"
             if children:
                 node["children"] = children
@@ -119,13 +178,28 @@ def scan_level(directory, expected, list_all, parent_id, root):
     return nodes
 
 
-# Wiki pages no other wiki page links to with [[name]], routing pages excepted:
-# what wiki-lint reports as having no inbound link
+def mark_installed(nodes, vault: Path):
+    lock = vault / SKILLS_LOCK
+    if not lock.is_file():
+        return nodes
+    installed = set(json.loads(lock.read_text(encoding="utf-8")).get("skills", {}))
+    for node in nodes:
+        if node.get("slot", node["id"]) == SKILLS_SLOT:
+            for skill in node.get("children", []):
+                if skill["name"] in installed:
+                    skill["installed"] = True
+    return nodes
+
+
+# Wiki pages no other wiki page or wiki canvas links to, routing pages excepted:
+# what wiki-lint reports as having no inbound link. A canvas only ever links
+# out; it is never an orphan itself
 def orphans_of(vault: Path) -> set:
     index = Index([rel.as_posix() for _, rel in walk_docs(vault, [], True)])
     links = link_map(vault, index)
     linked = {hit for source, hits in links.items() for hit in hits if hit != source}
-    return {page for page in links if page not in linked and Path(page).name not in ROUTING}
+    return {page for page in links
+            if page.endswith(".md") and page not in linked and Path(page).name not in ROUTING}
 
 
 def mark_orphans(nodes, orphans):
@@ -146,7 +220,7 @@ def display_path(vault: Path) -> str:
 
 def scan(vault: Path):
     root = display_path(vault)
-    nodes = scan_level(vault, LAYOUT, False, "", root)
+    nodes = mark_installed(scan_level(vault, LAYOUT, False, "", root), vault)
     return root, mark_orphans(nodes, orphans_of(vault))
 
 
