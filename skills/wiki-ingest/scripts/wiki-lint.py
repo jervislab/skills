@@ -23,14 +23,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from wikilink import SKIP_DIRS, Index, extract_targets, norm, walk_docs  # noqa: E402
+from wikilink import (ASSET_DIRS, ROUTING, SKIP_DIRS, Index, extract_targets,  # noqa: E402
+                      link_map, norm, walk_docs, wiki_pages)
 
 # main() 定位项目根后赋值
 ROOT = WIKI = None
-# 路由页只指路,没人链它是常态;它们的 frontmatter 也少一个 source
-ROUTING = {"index.md", "overview.md", "log.md"}
-# 图片提示词是资产不是知识页,不按页面规范要求它
-ASSET_DIRS = {"images"}
+# 路由页(ROUTING)的 frontmatter 少一个 source;资产目录(ASSET_DIRS)不按页面规范要求
 FIELDS = ("name", "description", "source", "last_updated")
 ROUTING_FIELDS = ("name", "description", "last_updated")
 
@@ -64,26 +62,6 @@ def non_page_targets():
         if path.is_file():
             names.add(path.stem.lower())
     return paths, names
-
-
-def wiki_pages():
-    return sorted(p for p in WIKI.rglob("*.md")
-                  if not set(p.relative_to(WIKI).parts[:-1]) & ASSET_DIRS)
-
-
-def inbound_map(index: Index) -> dict:
-    """谁链向谁。一次读完整个 wiki,单页检查也用它 —— 97 篇小文件,比反复 grep 快。"""
-    links = {}
-    for page in wiki_pages():
-        src = page.relative_to(ROOT).as_posix()
-        text = page.read_text(encoding="utf-8")
-        hit = set()
-        for target in extract_targets(text):
-            resolved = index.resolve(target, src)
-            if resolved:
-                hit.add(resolved)
-        links[src] = hit
-    return links
 
 
 def front_value(text: str, key: str) -> str:
@@ -227,21 +205,21 @@ def main() -> None:
             return
 
     index = build_index()
-    links = inbound_map(index)
+    links = link_map(ROOT, index)
     listed = indexed_pages(index)
     others = non_page_targets()
 
     if pages is None:
         total = 0
-        for page in wiki_pages():
+        for page in wiki_pages(WIKI):
             issues = check(page, index, links, listed, others)
             if issues:
                 total += 1
                 print(page.relative_to(ROOT).as_posix())
                 for issue in issues:
                     print("  ✗ " + issue)
-        print(f"\n{len(wiki_pages())} 篇,{total} 篇有待补" if total
-              else f"{len(wiki_pages())} 篇,双链完整")
+        print(f"\n{len(wiki_pages(WIKI))} 篇,{total} 篇有待补" if total
+              else f"{len(wiki_pages(WIKI))} 篇,双链完整")
         return
 
     failed = False

@@ -19,6 +19,11 @@ FENCE_RE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 LINK_RE = re.compile(r"!?\[\[([^\[\]\n]+?)\]\]")
 
+# 路由页只指路,没人链它是常态
+ROUTING = {"index.md", "overview.md", "log.md"}
+# 图片提示词是资产不是知识页,不进链接图
+ASSET_DIRS = {"images"}
+
 
 def walk_docs(root: Path, excludes, with_canvas: bool, skip_dirs=()):
     exts = ("*.md", "*.canvas") if with_canvas else ("*.md",)
@@ -141,3 +146,21 @@ class Index:
         name = Path(key).name
         return name if len(self.by_stem.get(name.lower(), [])) < 2 else key
         
+
+
+def wiki_pages(wiki: Path):
+    """链接图里的页面：wiki/ 下的 md，资产目录除外。标准件、代码、多媒体都不在图里，
+    谈不上孤儿与否。"""
+    return sorted(p for p in wiki.rglob("*.md")
+                  if not set(p.relative_to(wiki).parts[:-1]) & ASSET_DIRS)
+
+
+def link_map(root: Path, index: Index) -> dict:
+    """谁链向谁：页面 → 它解析得到的目标集合。wiki-lint 与 sync.py 都用这一份，
+    Dashboard 标出的孤儿与 lint 报的无入链永远同一个答案。"""
+    links = {}
+    for page in wiki_pages(root / "wiki"):
+        src = page.relative_to(root).as_posix()
+        text = page.read_text(encoding="utf-8", errors="replace")
+        links[src] = {hit for t in extract_targets(text) if (hit := index.resolve(t, src))}
+    return links

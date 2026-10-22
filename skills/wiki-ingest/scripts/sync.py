@@ -26,6 +26,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+# Orphans come from the same link resolver wiki-lint uses, so the Dashboard
+# and the lint never disagree about which page nothing links to
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from wikilink import ROUTING, Index, link_map, walk_docs  # noqa: E402
+
 CONFIG = Path.home() / ".jervis" / "sync.json"
 STATE = Path.home() / ".jervis" / "last-push.json"
 THROTTLE_SECONDS = 60
@@ -55,16 +60,12 @@ LAYOUT = [
 ]
 
 FRONTMATTER = re.compile(r"^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)")
-LINK = re.compile(r"\[\[([^\]|#]+)")
-HUBS = {"wiki/index.md", "wiki/log.md", "wiki/overview.md"}
 
 
-def file_state(path: Path, pages: dict, node_id: str) -> str:
+def file_state(path: Path) -> str:
     if path.suffix != ".md":
         return "filled" if path.stat().st_size > 0 else "skeleton"
     text = path.read_text(encoding="utf-8", errors="replace")
-    if node_id.startswith("wiki/"):
-        pages[node_id] = text
     return "filled" if FRONTMATTER.sub("", text, count=1).strip() else "skeleton"
 
 
@@ -76,14 +77,14 @@ def visible(directory: Path):
 def holds_content(directory: Path) -> bool:
     for entry in visible(directory):
         if entry.is_file():
-            if file_state(entry, {}, "") == "filled":
+            if file_state(entry) == "filled":
                 return True
         elif entry.is_dir() and holds_content(entry):
             return True
     return False
 
 
-def scan_level(directory, expected, list_all, parent_id, root, pages):
+def scan_level(directory, expected, list_all, parent_id, root):
     present = {entry.name: entry for entry in visible(directory)} if directory else {}
     specs = {spec["name"]: spec for spec in expected}
     if list_all:
@@ -99,16 +100,18 @@ def scan_level(directory, expected, list_all, parent_id, root, pages):
                 spec = {**spec, "name": alias}
         node_id = f"{parent_id}/{spec['name']}" if parent_id else spec["name"]
         node = {"id": node_id, "name": spec["name"], "path": f"{root}/{node_id}"}
+        if spec["kind"] == "directory":
+            node["folder"] = True
         entry = present.get(spec["name"])
         kind_matches = entry is not None and (entry.is_dir() if spec["kind"] == "directory" else entry.is_file())
         if not kind_matches:
             nodes.append({**node, "state": "missing"})
         elif entry.is_file():
-            nodes.append({**node, "state": file_state(entry, pages, node_id)})
+            nodes.append({**node, "state": file_state(entry)})
         elif not (spec.get("expand") or list_all):
             nodes.append({**node, "state": "filled" if holds_content(entry) else "skeleton"})
         else:
-            children = scan_level(entry, spec.get("children", []), True, node_id, root, pages)
+            children = scan_level(entry, spec.get("children", []), True, node_id, root)
             node["state"] = "filled" if any(c["state"] == "filled" for c in children) else "skeleton"
             if children:
                 node["children"] = children
@@ -116,17 +119,13 @@ def scan_level(directory, expected, list_all, parent_id, root, pages):
     return nodes
 
 
-# Wiki pages no other page links to with [[name]], hubs excepted
-def orphans_of(pages: dict) -> set:
-    by_name = {node_id.rsplit("/", 1)[-1].removesuffix(".md").lower(): node_id for node_id in pages}
-    linked = set()
-    for source, text in pages.items():
-        for match in LINK.finditer(text):
-            name = match.group(1).strip().rsplit("/", 1)[-1].removesuffix(".md").lower()
-            target = by_name.get(name)
-            if target and target != source:
-                linked.add(target)
-    return {node_id for node_id in pages if node_id not in linked and node_id not in HUBS}
+# Wiki pages no other wiki page links to with [[name]], routing pages excepted:
+# what wiki-lint reports as having no inbound link
+def orphans_of(vault: Path) -> set:
+    index = Index([rel.as_posix() for _, rel in walk_docs(vault, [], True)])
+    links = link_map(vault, index)
+    linked = {hit for source, hits in links.items() for hit in hits if hit != source}
+    return {page for page in links if page not in linked and Path(page).name not in ROUTING}
 
 
 def mark_orphans(nodes, orphans):
@@ -147,9 +146,8 @@ def display_path(vault: Path) -> str:
 
 def scan(vault: Path):
     root = display_path(vault)
-    pages: dict = {}
-    nodes = scan_level(vault, LAYOUT, False, "", root, pages)
-    return root, mark_orphans(nodes, orphans_of(pages))
+    nodes = scan_level(vault, LAYOUT, False, "", root)
+    return root, mark_orphans(nodes, orphans_of(vault))
 
 
 def load_config():
