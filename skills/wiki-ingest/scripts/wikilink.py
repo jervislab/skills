@@ -5,6 +5,7 @@
 wiki-lint.py 与仓库里的双链图谱都 import 这一份，检查与图谱永远同一个答案。
 """
 
+import json
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -148,19 +149,40 @@ class Index:
         
 
 
-def wiki_pages(wiki: Path):
-    """链接图里的页面：wiki/ 下的 md，资产目录除外。标准件、代码、多媒体都不在图里，
-    谈不上孤儿与否。"""
-    return sorted(p for p in wiki.rglob("*.md")
+def wiki_docs(wiki: Path, pattern: str):
+    return sorted(p for p in wiki.rglob(pattern)
                   if not set(p.relative_to(wiki).parts[:-1]) & ASSET_DIRS)
 
 
+def wiki_pages(wiki: Path):
+    """链接图里的页面：wiki/ 下的 md，资产目录除外。标准件、代码、多媒体都不在图里，
+    谈不上孤儿与否。"""
+    return wiki_docs(wiki, "*.md")
+
+
+def canvas_targets(text: str):
+    """canvas 是 JSON：文本节点里的 [[链接]] 与文件节点指向的路径，都是它链出去的边。
+    读不成 JSON 的 canvas 没有边。"""
+    try:
+        nodes = json.loads(text).get("nodes", [])
+    except (ValueError, AttributeError):
+        return
+    for node in nodes:
+        if node.get("type") == "text":
+            yield from extract_targets(node.get("text", ""))
+        elif node.get("type") == "file" and node.get("file"):
+            yield drop_rel(node["file"])
+
+
 def link_map(root: Path, index: Index) -> dict:
-    """谁链向谁：页面 → 它解析得到的目标集合。wiki-lint 与 sync.py 都用这一份，
-    Dashboard 标出的孤儿与 lint 报的无入链永远同一个答案。"""
+    """谁链向谁：来源 → 它解析得到的目标集合。来源是 wiki 页面，加上 wiki/ 下的 canvas ——
+    只被 canvas 引用的页面也有入链。孤儿只在页面里判定，canvas 只当来源。
+    wiki-lint、sync.py 与 Dashboard 的浏览器扫描用同一套规则，孤儿永远同一个答案。"""
     links = {}
-    for page in wiki_pages(root / "wiki"):
-        src = page.relative_to(root).as_posix()
-        text = page.read_text(encoding="utf-8", errors="replace")
-        links[src] = {hit for t in extract_targets(text) if (hit := index.resolve(t, src))}
+    wiki = root / "wiki"
+    for doc in wiki_docs(wiki, "*.md") + wiki_docs(wiki, "*.canvas"):
+        src = doc.relative_to(root).as_posix()
+        text = doc.read_text(encoding="utf-8", errors="replace")
+        targets = canvas_targets(text) if doc.suffix == ".canvas" else extract_targets(text)
+        links[src] = {hit for t in targets if (hit := index.resolve(t, src))}
     return links
