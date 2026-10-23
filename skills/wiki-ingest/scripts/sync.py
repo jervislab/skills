@@ -44,11 +44,13 @@ TIMEOUT_SECONDS = 5
 #   repository  a git repository, filled once it holds a commit
 #   expand      list everything inside, at every depth
 #   shallow     list what is directly inside, each entry read as a whole
+#   candidate   where an unmarked design system may sit, reported on the
+#               missing slot
 LAYOUT = [
     {"name": "AGENTS.md", "kind": "file", "aliases": ["CLAUDE.md"]},
     {"name": "glossary.md", "kind": "file"},
     {"name": "inbox.md", "kind": "file"},
-    {"name": "refs", "kind": "directory"},
+    {"name": "refs", "kind": "directory", "expand": True},
     {"name": ".git", "kind": "directory", "repository": True},
     {
         "name": "wiki",
@@ -107,8 +109,23 @@ def repository_state(entry: Path) -> str:
     return "skeleton"
 
 
+# Images carry nothing an agent reads, and a folder of clippings' images would
+# outnumber the pages they illustrate: neither becomes a node or fills a slot.
+# Must match the Dashboard's browser scan.
+IMAGE_FOLDERS = {"image", "images"}
+IMAGE_FILE = re.compile(r"\.(?:png|jpe?g|gif|webp|avif|heic|bmp|ico|tiff?|svgz?)$", re.I)
+
+
+def is_listed(entry: Path) -> bool:
+    if entry.name.startswith("."):
+        return False
+    if entry.is_dir():
+        return entry.name.lower() not in IMAGE_FOLDERS
+    return not IMAGE_FILE.search(entry.name)
+
+
 def visible(directory: Path):
-    return [entry for entry in directory.iterdir() if not entry.name.startswith(".")]
+    return [entry for entry in directory.iterdir() if is_listed(entry)]
 
 
 # A directory is filled once anything inside it is
@@ -157,6 +174,8 @@ def scan_level(directory, expected, list_all, parent_id, root, descend=True):
         if entry.is_dir() if entry else spec["kind"] == "directory":
             node["folder"] = True
         if entry is None:
+            if spec.get("candidate"):
+                node["candidate"] = spec["candidate"]
             nodes.append({**node, "state": "missing"})
         elif spec.get("repository"):
             nodes.append({**node, "state": repository_state(entry)})
@@ -204,12 +223,23 @@ def is_own(skill: Path) -> bool:
     return carries_mark(skill / "SKILL.md", OWN_MARK)
 
 
-def mark_own(nodes, vault: Path):
+# Skills a registry installed, by the names the vault's skills-lock.json lists
+def registry_skills(vault: Path) -> set:
+    try:
+        return set(json.loads((vault / "skills-lock.json").read_text()).get("skills", {}))
+    except (OSError, ValueError, AttributeError):
+        return set()
+
+
+def mark_skills(nodes, vault: Path):
+    registry = registry_skills(vault)
     for node in nodes:
         if node.get("slot", node["id"]) == SKILLS_SLOT:
             for skill in node.get("children", []):
                 if is_own(vault / skill["id"]):
                     skill["own"] = True
+                if skill["name"] in registry:
+                    skill["registry"] = True
     return nodes
 
 
@@ -241,17 +271,48 @@ def find_design_mark(vault: Path) -> str | None:
     return None
 
 
+# A folder shaped like a design system: named as one, or laid out as a Claude
+# Design export, its token sheet beside an entry page
+def looks_like_design(directory: Path) -> bool:
+    if "design-system" in directory.name.lower():
+        return True
+    names = {entry.name for entry in visible(directory)}
+    return "colors_and_type.css" in names and bool({"SKILL.md", "README.md"} & names)
+
+
+# The candidate nearest the root, by name within a level, as the mark is found
+def find_design_candidate(vault: Path) -> str | None:
+    level = [vault]
+    for _ in range(DESIGN_DEPTH):
+        following = []
+        for directory in level:
+            for entry in sorted(visible(directory), key=lambda entry: entry.name):
+                if not entry.is_dir() or entry.name in DESIGN_SKIP:
+                    continue
+                if looks_like_design(entry):
+                    return entry.relative_to(vault).as_posix()
+                following.append(entry)
+        level = following
+    return None
+
+
 # The scaffold's design slot needs no mark; only without it does the scan look
-# deeper, and the marked page fills the slot as an alias
+# deeper, and the marked page fills the slot as an alias. Without a mark, a
+# folder shaped like a design system is named on the empty slot instead.
 def layout_of(vault: Path):
     design = next(spec for spec in LAYOUT if spec["name"] == DESIGN_SLOT)
     names = [design["name"], *design.get("aliases", [])]
     if any((vault / name).exists() for name in names):
         return LAYOUT
     marked = find_design_mark(vault)
-    if not marked:
-        return LAYOUT
-    return [{**spec, "aliases": [*names[1:], marked]} if spec is design else spec for spec in LAYOUT]
+    if marked:
+        found = {"aliases": [*names[1:], marked]}
+    else:
+        candidate = find_design_candidate(vault)
+        if not candidate:
+            return LAYOUT
+        found = {"candidate": candidate}
+    return [{**spec, **found} if spec is design else spec for spec in LAYOUT]
 
 
 # Wiki pages no other wiki page or wiki canvas links to, routing pages excepted:
@@ -283,7 +344,7 @@ def display_path(vault: Path) -> str:
 
 def scan(vault: Path):
     root = display_path(vault)
-    nodes = mark_own(scan_level(vault, layout_of(vault), False, "", root), vault)
+    nodes = mark_skills(scan_level(vault, layout_of(vault), False, "", root), vault)
     return root, mark_orphans(nodes, orphans_of(vault))
 
 
