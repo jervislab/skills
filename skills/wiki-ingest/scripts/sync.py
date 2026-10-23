@@ -3,9 +3,10 @@
 runs, every command is a silent no-op and nothing leaves the machine.
 
 What is sent: the vault's name and path, and its structure tree (file and
-folder names, paths, and whether each is missing, a skeleton, or filled).
-Page content is never read into the report, only used locally to judge
-fill and orphans.
+folder names, paths, and whether each is missing, a skeleton, or filled),
+with each page's frontmatter `name` and `description` and the paths of the
+pages it links to and from. Page bodies are never read into the report, only
+used locally to judge fill, orphans, and links.
 
     python3 scripts/sync.py connect <endpoint> <token>   save credentials, report once
     python3 scripts/sync.py push [vault_dir]             report a vault (default: cwd)
@@ -29,7 +30,15 @@ from pathlib import Path
 # Orphans come from the same link resolver wiki-lint uses, so the Dashboard
 # and the lint never disagree about which page nothing links to
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from wikilink import ROUTING, Index, link_map, walk_docs  # noqa: E402
+from wikilink import (  # noqa: E402
+    ROUTING,
+    Index,
+    canvas_targets,
+    extract_targets,
+    link_map,
+    walk_docs,
+    wiki_docs,
+)
 
 CONFIG = Path.home() / ".jervis" / "sync.json"
 STATE = Path.home() / ".jervis" / "last-push.json"
@@ -70,7 +79,9 @@ LAYOUT = [
     {"name": ".claude/skills", "kind": "directory", "aliases": [".agents/skills"], "shallow": True},
     # Written by hand or imported, as a Claude Design export
     {"name": "DESIGN.md", "kind": "file", "aliases": ["design-system"]},
-    {"name": "scripts", "kind": "directory"},
+    # One node per script; a folder inside is read whole, since a tool's
+    # dependencies, such as node_modules, would bury the scripts
+    {"name": "scripts", "kind": "directory", "shallow": True},
 ]
 
 SKILLS_SLOT = ".claude/skills"
@@ -326,12 +337,87 @@ def orphans_of(vault: Path) -> set:
             if page.endswith(".md") and page not in linked and Path(page).name not in ROUTING}
 
 
-def mark_orphans(nodes, orphans):
+def front_matter(text: str) -> dict:
+    """A page's own account of itself: frontmatter `name` and `description`, as
+    plexus.py reads them. A block scalar gives its first line with content;
+    quotes come off. Must match frontMatter in the Dashboard's wikilink.ts."""
+    if not text.startswith("---"):
+        return {}
+    end = text.find("\n---", 3)
+    if end < 0:
+        return {}
+    found = {}
+    lines = text[3:end].splitlines()
+    for i, line in enumerate(lines):
+        for key in ("name", "description"):
+            if key in found or not line.startswith(key + ":"):
+                continue
+            value = line[len(key) + 1:].strip()
+            if value in ("|", ">", "|-", ">-"):
+                value = next((l.strip() for l in lines[i + 1:] if l[:1] in (" ", "\t") and l.strip()), "")
+            if len(value) > 1 and value[0] in ('"', "'") and value[-1] == value[0]:
+                value = value[1:-1]
+            if value:
+                found[key] = value
+    return {
+        **({"title": found["name"]} if "name" in found else {}),
+        **({"description": found["description"]} if "description" in found else {}),
+    }
+
+
+def stem_of(rel: str) -> str:
+    return re.sub(r"\.(md|canvas)$", "", Path(rel).name, flags=re.I)
+
+
+def pages_of(vault: Path):
+    """Each page's and canvas's frontmatter and wiki-links out and in, read
+    wherever the page is, as readLinkGraph in the Dashboard's wikilink.ts reads
+    them. A linked page is named by its stem, prefixed with its folder where
+    another page shares the stem."""
+    indexed = [rel.as_posix() for _, rel in walk_docs(vault, [], True)]
+    index = Index(indexed)
+    wiki = vault / "wiki"
+    under_wiki = [doc.relative_to(vault).as_posix()
+                  for doc in wiki_docs(wiki, "*.md") + wiki_docs(wiki, "*.canvas")]
+    sources = sorted(set(indexed) | set(under_wiki))
+    meta, outgoing = {}, {}
+    for rel in sources:
+        text = (vault / rel).read_text(encoding="utf-8", errors="replace")
+        is_canvas = rel.endswith(".canvas")
+        if not is_canvas and (own := front_matter(text)):
+            meta[rel] = own
+        targets = canvas_targets(text) if is_canvas else extract_targets(text)
+        outgoing[rel] = {hit for t in targets if (hit := index.resolve(t, rel)) and hit != rel}
+    stems = {}
+    for rel in sources:
+        stems[stem_of(rel)] = stems.get(stem_of(rel), 0) + 1
+
+    def ref(rel):
+        folder = Path(rel).parent.name
+        stem = stem_of(rel)
+        return {"path": rel, "label": f"{folder}/{stem}" if stems[stem] > 1 and folder else stem}
+
+    incoming = {}
+    for source, targets in outgoing.items():
+        for target in targets:
+            incoming.setdefault(target, []).append(source)
+    links = {rel: {"out": [ref(t) for t in sorted(outgoing[rel])],
+                   "in": [ref(s) for s in sorted(incoming.get(rel, []))]}
+             for rel in sources}
+    return meta, links
+
+
+def mark_pages(nodes, orphans, meta, links):
+    """What the link graph knows of each node: orphan, frontmatter, links. A
+    node's id is its vault-relative path, the graph's key."""
     for node in nodes:
         if node["id"] in orphans:
             node["orphan"] = True
+        node.update(meta.get(node["id"], {}))
+        if node["id"] in links:
+            node["links"] = links[node["id"]]
         if "children" in node:
-            mark_orphans(node["children"], orphans)
+            mark_pages(node["children"], orphans, meta, links)
     return nodes
 
 
@@ -345,7 +431,7 @@ def display_path(vault: Path) -> str:
 def scan(vault: Path):
     root = display_path(vault)
     nodes = mark_skills(scan_level(vault, layout_of(vault), False, "", root), vault)
-    return root, mark_orphans(nodes, orphans_of(vault))
+    return root, mark_pages(nodes, orphans_of(vault), *pages_of(vault))
 
 
 def load_config():
