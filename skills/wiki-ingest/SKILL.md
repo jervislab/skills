@@ -73,11 +73,11 @@ Recording criteria and the consolidation flow live in `references/friction-inbox
 
 Guards against wiki rot at edit time, not in a later cleanup. `scripts/wiki-lint.py` runs the quick mechanical pass; its docstring carries usage, and `scripts/scaffold-wiki.sh` wires it into a PostToolUse hook.
 
-On invocation, run `--all` and fix what it reports. Then surface what no script can judge — stale claims, `[[concept]]` pages that should exist, fillable data gaps, skills not yet judged for the Own Skills mark — as a list for the user to decide.
+On invocation, run `--all` and fix what it reports. Then surface what no script can judge — stale claims, `[[concept]]` pages that should exist, fillable data gaps, skills not yet judged for the Own Skills mark, a design system below the root without its mark — as a list for the user to decide.
 
 ## JERVIS Sync
 
-Optional. `scripts/sync.py` reports the vault's structure to a JERVIS Dashboard: the vault's name and path, and a tree of file and folder names with each one's fill state. Page content never leaves the machine. Until `sync.py connect <endpoint> <token>` has run, every sync command is a silent no-op.
+Optional. `scripts/sync.py` reports the vault's structure to a JERVIS Dashboard: the vault's name and path, and a tree of file and folder names with each one's fill state. Page content never leaves the machine. Until `sync.py connect <endpoint> <token>` has run, every sync command is a silent no-op. A git worktree is never reported: it is a branch of the vault, and the main checkout speaks for it.
 
 Scaffold wires `sync.py --hook` into PostToolUse beside wiki-lint and reports once. A vault scaffolded before that has neither: once connected, add the same hook entry to its `.claude/settings.json` (the shape scaffold-wiki.sh writes), then run `sync.py push <vault>` once.
 
@@ -91,6 +91,17 @@ metadata:
 ```
 
 Write the mark when you create a skill with the user, in Bootstrap or any later iteration. A skill already in `.claude/skills/` or `.agents/skills/` without the mark gets judged once: evidence that it is the user's own includes being authored in this vault (git history), naming the user as author, and appearing in no registry lock such as `skills-lock.json`. When the evidence is unclear, ask the user. Never mark or edit a skill someone else wrote.
+
+## Design System
+
+JERVIS finds a design system at the vault root as `DESIGN.md` or `design-system/`, the scaffold's slot, with no mark needed. A design system kept deeper, or imported under another name such as a Claude Design export, carries a mark in its frontmatter instead:
+
+```yaml
+metadata:
+  role: design-system
+```
+
+Only when the root holds neither does `sync.py` look for the mark, two folders deep at most, skipping hidden folders, `node_modules`, `wiki/`, and `refs/`; the shallowest marked `.md` wins, first by name within a level. Mark one page per vault: the spec the user's agent reads before designing a surface, not a token file or a component sheet beside it. When it is unclear which page is the spec, ask the user.
 
 ## Source Routing
 

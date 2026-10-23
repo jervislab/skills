@@ -175,24 +175,33 @@ def scan_level(directory, expected, list_all, parent_id, root, descend=True):
     return nodes
 
 
+# A judgment the agent records in a page's frontmatter, as `key: value` under
+# metadata, block or flow style
+def metadata_mark(key: str, value: str):
+    return re.compile(
+        rf"^metadata:[ \t]*(?:\n[ \t]+.*)*?\n[ \t]+{key}:[ \t]*[\"']?{value}[\"']?[ \t]*$"
+        rf"|^metadata:[ \t]*\{{[^}}]*\b{key}:[ \t]*[\"']?{value}\b",
+        re.M,
+    )
+
+
+def carries_mark(page: Path, mark) -> bool:
+    if not page.is_file():
+        return False
+    frontmatter = FRONTMATTER.match(page.read_text(encoding="utf-8", errors="replace"))
+    return bool(frontmatter and mark.search(frontmatter.group(0)))
+
+
 # A skill the user made with their agent says so in its SKILL.md frontmatter,
 # written by the agent once it has judged where the skill came from:
 #   metadata:
 #     origin: own
 # Anything unmarked, installed or not yet judged, is not the user's own.
-OWN_MARK = re.compile(
-    r"^metadata:[ \t]*(?:\n[ \t]+.*)*?\n[ \t]+origin:[ \t]*[\"']?own[\"']?[ \t]*$"
-    r"|^metadata:[ \t]*\{[^}]*\borigin:[ \t]*[\"']?own\b",
-    re.M,
-)
+OWN_MARK = metadata_mark("origin", "own")
 
 
 def is_own(skill: Path) -> bool:
-    manifest = skill / "SKILL.md"
-    if not manifest.is_file():
-        return False
-    frontmatter = FRONTMATTER.match(manifest.read_text(encoding="utf-8", errors="replace"))
-    return bool(frontmatter and OWN_MARK.search(frontmatter.group(0)))
+    return carries_mark(skill / "SKILL.md", OWN_MARK)
 
 
 def mark_own(nodes, vault: Path):
@@ -202,6 +211,47 @@ def mark_own(nodes, vault: Path):
                 if is_own(vault / skill["id"]):
                     skill["own"] = True
     return nodes
+
+
+# A design system kept below the root, or imported under another name, says so
+# in its frontmatter, written by the agent once it has judged the page to be one:
+#   metadata:
+#     role: design-system
+DESIGN_SLOT = "DESIGN.md"
+DESIGN_MARK = metadata_mark("role", "design-system")
+DESIGN_DEPTH = 2
+# Folders that hold sources or know-how, never the design system itself
+DESIGN_SKIP = {"node_modules", "refs", "wiki"}
+
+
+# The marked page nearest the root, by name within a level, so this sync and
+# the Dashboard's scan pick the same one
+def find_design_mark(vault: Path) -> str | None:
+    level = [vault]
+    for _ in range(DESIGN_DEPTH + 1):
+        following = []
+        for directory in level:
+            for entry in sorted(visible(directory), key=lambda entry: entry.name):
+                if entry.is_dir():
+                    if entry.name not in DESIGN_SKIP:
+                        following.append(entry)
+                elif entry.suffix == ".md" and carries_mark(entry, DESIGN_MARK):
+                    return entry.relative_to(vault).as_posix()
+        level = following
+    return None
+
+
+# The scaffold's design slot needs no mark; only without it does the scan look
+# deeper, and the marked page fills the slot as an alias
+def layout_of(vault: Path):
+    design = next(spec for spec in LAYOUT if spec["name"] == DESIGN_SLOT)
+    names = [design["name"], *design.get("aliases", [])]
+    if any((vault / name).exists() for name in names):
+        return LAYOUT
+    marked = find_design_mark(vault)
+    if not marked:
+        return LAYOUT
+    return [{**spec, "aliases": [*names[1:], marked]} if spec is design else spec for spec in LAYOUT]
 
 
 # Wiki pages no other wiki page or wiki canvas links to, routing pages excepted:
@@ -233,7 +283,7 @@ def display_path(vault: Path) -> str:
 
 def scan(vault: Path):
     root = display_path(vault)
-    nodes = mark_own(scan_level(vault, LAYOUT, False, "", root), vault)
+    nodes = mark_own(scan_level(vault, layout_of(vault), False, "", root), vault)
     return root, mark_orphans(nodes, orphans_of(vault))
 
 
@@ -289,6 +339,13 @@ def vault_of(path: Path) -> Path | None:
     return None
 
 
+# A linked worktree is a branch of a vault checked out beside it, its .git a
+# file pointing home: reported under its own folder name it would read as a
+# second vault, and under the vault's it would overwrite the main checkout
+def is_worktree(vault: Path) -> bool:
+    return (vault / ".git").is_file()
+
+
 def throttled(vault: Path) -> bool:
     try:
         last = json.loads(STATE.read_text())
@@ -308,7 +365,7 @@ def hook(config: dict) -> int:
         payload = json.load(sys.stdin)
         edited = Path(payload.get("tool_input", {}).get("file_path", ""))
         vault = vault_of(edited.parent if edited.suffix else edited)
-        if vault and not throttled(vault):
+        if vault and not is_worktree(vault) and not throttled(vault):
             push(vault, config)
     except Exception:
         pass  # Reporting is a side channel; it never blocks an edit
@@ -325,6 +382,9 @@ def main(argv) -> int:
         if not config:
             return 0
         vault = Path(argv[1] if len(argv) > 1 else ".").resolve()
+        if is_worktree(vault):
+            print(f"{vault.name} is a git worktree; JERVIS tracks the main checkout", file=sys.stderr)
+            return 0
         try:
             result = push(vault, config)
         except (urllib.error.URLError, TimeoutError) as error:
