@@ -90,11 +90,12 @@ if "wiki-lint.py" not in wired:
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [{"type": "command", "command": f'python3 "{scripts}/wiki-lint.py" --hook',
                    "statusMessage": "Checking wiki backlinks...", "timeout": 20}]})
+# sync.py follows every tool that can change files, shell included, and
+# every prompt, which brings in what the user changed in their editor
 if "sync.py" not in wired:
-    hooks.append({
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [{"type": "command", "command": f'python3 "{scripts}/sync.py" --hook',
-                   "timeout": 10}]})
+    sync = [{"type": "command", "command": f'python3 "{scripts}/sync.py" --hook', "timeout": 10}]
+    hooks.append({"matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash", "hooks": sync})
+    settings["hooks"].setdefault("UserPromptSubmit", []).append({"hooks": sync})
 path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n")
 HOOKEOF
 

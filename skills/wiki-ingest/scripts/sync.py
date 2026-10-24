@@ -10,17 +10,22 @@ used locally to judge fill, orphans, and links.
 
     python3 scripts/sync.py connect <endpoint> <token>   save credentials, report once
     python3 scripts/sync.py push [vault_dir]             report a vault (default: cwd)
-    python3 scripts/sync.py --hook                       PostToolUse hook: report the edited vault
+    python3 scripts/sync.py --hook                       hook: report the vault in the background
 
-Credentials live in ~/.jervis/sync.json (mode 600). The hook never fails an
-edit: network errors are swallowed, and a vault is reported at most once a
-minute.
+Credentials live in ~/.jervis/sync.json (mode 600). The hook never fails or
+slows an edit: it hands the vault to a background flush and returns. The flush
+waits until edits have paused for a few seconds, reports once, and reports
+again if more edits landed meanwhile, so the last change always goes out;
+a tree identical to the last one reported is not sent again.
 """
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import json
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -41,8 +46,10 @@ from wikilink import (  # noqa: E402
 )
 
 CONFIG = Path.home() / ".jervis" / "sync.json"
-STATE = Path.home() / ".jervis" / "last-push.json"
-THROTTLE_SECONDS = 60
+# Per vault: when it was last edited, a lock held by its one running flush,
+# and the digest of the tree it last reported
+PENDING = Path.home() / ".jervis" / "pending"
+QUIET_SECONDS = 3
 TIMEOUT_SECONDS = 5
 
 # What wiki-ingest scaffolds, grouped by the milestone that tracks each slot:
@@ -453,12 +460,16 @@ def post(config: dict, body: dict | None):
         return json.loads(response.read() or b"{}")
 
 
-def push(vault: Path, config: dict) -> dict:
+def report_of(vault: Path) -> dict:
     root, tree = scan(vault)
-    return post(config, {
+    return {
         "vault": {"name": vault.name, "path": root, "absolutePath": str(vault)},
         "tree": tree,
-    })
+    }
+
+
+def push(vault: Path, config: dict) -> dict:
+    return post(config, report_of(vault))
 
 
 def connect(endpoint: str, token: str) -> int:
@@ -493,30 +504,63 @@ def is_worktree(vault: Path) -> bool:
     return (vault / ".git").is_file()
 
 
-def throttled(vault: Path) -> bool:
+def pending_of(vault: Path) -> Path:
+    PENDING.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return PENDING / hashlib.sha1(str(vault).encode()).hexdigest()[:16]
+
+
+def edited_at(pending: Path) -> float:
     try:
-        last = json.loads(STATE.read_text())
+        return float(pending.with_suffix(".edited").read_text())
     except (OSError, ValueError):
-        last = {}
-    now = time.time()
-    if now - last.get(str(vault), 0) < THROTTLE_SECONDS:
-        return True
-    last[str(vault)] = now
-    STATE.parent.mkdir(mode=0o700, exist_ok=True)
-    STATE.write_text(json.dumps(last))
-    return False
+        return 0.0
 
 
+# Shell commands and prompts name no file, so the session's folder stands in;
+# a prompt catches what the user changed in their editor since the last turn
 def hook(config: dict) -> int:
     try:
         payload = json.load(sys.stdin)
-        edited = Path(payload.get("tool_input", {}).get("file_path", ""))
-        vault = vault_of(edited.parent if edited.suffix else edited)
-        if vault and not is_worktree(vault) and not throttled(vault):
-            push(vault, config)
+        edited = payload.get("tool_input", {}).get("file_path")
+        start = Path(edited) if edited else Path(payload.get("cwd", "."))
+        vault = vault_of(start.parent if start.suffix else start)
+        if vault and not is_worktree(vault):
+            pending_of(vault).with_suffix(".edited").write_text(str(time.time()))
+            subprocess.Popen(
+                [sys.executable, __file__, "--flush", str(vault)],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, start_new_session=True,
+            )
     except Exception:
         pass  # Reporting is a side channel; it never blocks an edit
     return 0
+
+
+# Every hook starts a flush; all but the one holding the vault's lock exit at
+# once. An edit landing after the holder's report is caught either by that
+# holder, which checks again once it lets go, or by the flush the edit started
+def flush(vault: Path, config: dict) -> int:
+    pending = pending_of(vault)
+    while True:
+        with open(pending.with_suffix(".lock"), "w") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                return 0
+            while (wait := edited_at(pending) + QUIET_SECONDS - time.time()) > 0:
+                time.sleep(wait)
+            started = time.time()
+            try:
+                report = report_of(vault)
+                digest = hashlib.sha256(json.dumps(report, sort_keys=True).encode()).hexdigest()
+                sent = pending.with_suffix(".sent")
+                if not sent.exists() or sent.read_text() != digest:
+                    post(config, report)
+                    sent.write_text(digest)
+            except Exception:
+                pass
+        if edited_at(pending) < started:
+            return 0
 
 
 def main(argv) -> int:
@@ -525,6 +569,8 @@ def main(argv) -> int:
     config = load_config()
     if argv[:1] == ["--hook"]:
         return hook(config) if config else 0
+    if argv[:1] == ["--flush"] and len(argv) == 2:
+        return flush(Path(argv[1]), config) if config else 0
     if argv[:1] == ["push"]:
         if not config:
             return 0

@@ -3,13 +3,13 @@
 - Write every intermediate artifact as a local md file
 - When a global concept is easy to confuse, confirm it with the user, then add it to glossary.md
 - Retrieve first; wisdom accumulated in the wiki serves as reference
-- Wiki Layer: sources/ (raw, read-only) → wiki/ (knowledge output maintained by the agent) → AGENTS.md (schema).
+- Wiki Layer: sources/ (raw material, landed as-is) → wiki/ (knowledge output maintained by the agent) → AGENTS.md (schema).
 
 ### Ingest
 
 Land all external material in sources/ before triage; skip no step.
 
-Step 1: Fetch — capture as md and save to sources/. sources/ is the read-only raw layer.
+Step 1: Fetch — capture as md and save to sources/. sources/ is the raw layer.
 
 Step 2: Triage — after reading the full text, judge signal density and destination:
 - → reference: contains a reusable principle / method; absorb into the target skill's references/. Follow `references/absorb-to-reference.md`.

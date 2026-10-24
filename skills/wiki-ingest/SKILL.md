@@ -79,7 +79,7 @@ On invocation, run `--all` and fix what it reports. Then surface what no script 
 
 Optional. `scripts/sync.py` reports the vault's structure to a JERVIS Dashboard: the vault's name and path, and a tree of file and folder names with each one's fill state, each page's frontmatter `name` and `description`, and the paths of the pages it links to and from. Page bodies never leave the machine. Until `sync.py connect <endpoint> <token>` has run, every sync command is a silent no-op. A git worktree is never reported: it is a branch of the vault, and the main checkout speaks for it.
 
-Scaffold wires `sync.py --hook` into PostToolUse beside wiki-lint and reports once. A vault scaffolded before that has neither: once connected, add the same hook entry to its `.claude/settings.json` (the shape scaffold-wiki.sh writes), then run `sync.py push <vault>` once.
+Scaffold wires `sync.py --hook` beside wiki-lint, into PostToolUse for every tool that can change files (shell included) and into UserPromptSubmit, which brings in edits the user made in their editor, then reports once. A vault scaffolded before that has neither: once connected, add the same hook entry to its `.claude/settings.json` (the shape scaffold-wiki.sh writes), then run `sync.py push <vault>` once.
 
 ## Own Skills
 
