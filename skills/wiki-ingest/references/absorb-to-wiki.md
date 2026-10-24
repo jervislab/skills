@@ -4,11 +4,11 @@ Read one source and absorb it into wiki knowledge pages. Complements absorb-to-r
 
 ## Principle
 
-Wisdom is subtraction: extract transferable frameworks and mindsets. The wiki holds only the judgments and connections taken out of the source; the argument stays in refs/. Cases, analogies, worked numbers, and anecdotes in the source are the author's argument — write the rule they support, or drop them. Cases the user brings from their own experience during Discuss are user input and may stay.
+Wisdom is subtraction: extract transferable frameworks and mindsets. The wiki holds only the judgments and connections taken out of the source; the argument stays in sources/. Cases, analogies, worked numbers, and anecdotes in the source are the author's argument — write the rule they support, or drop them. Cases the user brings from their own experience during Discuss are user input and may stay.
 
 ## Three-layer architecture
 
-refs/ (raw sources, source of truth) → wiki/ (agent-maintained processing layer) → AGENTS.md Wiki Layer (schema).
+sources/ (raw, source of truth) → wiki/ (agent-maintained processing layer) → AGENTS.md Wiki Layer (schema).
 
 ## Workflow
 
@@ -32,11 +32,11 @@ Extract the source's delta against pre-training common knowledge plus existing w
 
 Rebuild the source's decomposition independently. Question every classification axis; the output should be a better decomposition.
 
-Output has two layers. The summary page (`wiki/summaries/`) holds the source's framework — decomposition, core judgments, methodological skeleton — bound to a single ref source, linking back to refs with `[[link]]` when phenomenon-level support is needed. Concept pages (`wiki/concepts/`) extract from the summary the invariant rules that transfer across domains. The two connect through `[[wiki-link]]` without restating each other: the summary links to concepts for cross-domain rules, the concept links to the summary for source context, and each writes only its own layer. People, products, and organizations in the source get entity pages (`wiki/entities/`); see `entity-bootstrap.md` for that flow.
+Output has two layers. The summary page (`wiki/summaries/`) holds the source's framework — decomposition, core judgments, methodological skeleton — bound to a single source, linking back to it with `[[link]]` when phenomenon-level support is needed. Concept pages (`wiki/concepts/`) extract from the summary the invariant rules that transfer across domains. The two connect through `[[wiki-link]]` without restating each other: the summary links to concepts for cross-domain rules, the concept links to the summary for source context, and each writes only its own layer. People, products, and organizations in the source get entity pages (`wiki/entities/`); see `entity-bootstrap.md` for that flow.
 
 ### Source attribution
 
-A summaries/ page binds to a single ref source and holds only that source's knowledge. Knowledge from outside refs (user plans, original judgments) gets its own concept page, linked via `[[wiki-link]]`, and stays out of the summary page.
+A summaries/ page binds to a single source and holds only that source's knowledge. Knowledge from outside sources/ (user plans, original judgments) gets its own concept page, linked via `[[wiki-link]]`, and stays out of the summary page.
 
 ### 5. Fuse
 
@@ -60,7 +60,7 @@ Frontmatter:
 ---
 name: Page title, conclusion-first
 description: One-line summary of mechanism or content, not repeating what name already says
-source: refs/<file>
+source: sources/<file>
 last_updated: YYYY-MM-DD
 ---
 ```
@@ -69,9 +69,9 @@ last_updated: YYYY-MM-DD
 
 `description` is the agent's retrieval hook: grepping frontmatter across the repo yields the knowledge map, so it states the mechanism or content in one line without repeating characters from name. `name: description` concatenated is the description column of `wiki/index.md`; the two share one source.
 
-`source` points to the raw source path in refs/. Metadata such as url and author live only in the refs/ file. Knowledge from user conversation = `source: user input`.
+`source` points to the raw file path in sources/. Metadata such as url and author live only in the sources/ file. Knowledge from user conversation = `source: user input`.
 
-When refs/ holds no original link (the source is a periodical excerpt, or lives outside refs/), append it: `source: xxx · https://xxx`. No separate `url` field, no markdown link.
+When sources/ holds no original link (the source is a periodical excerpt, or lives outside sources/), append it: `source: xxx · https://xxx`. No separate `url` field, no markdown link.
 
 Quote a YAML value as a whole when it starts with `[ { & * ! | > % @` or a quote mark.
 
@@ -87,6 +87,6 @@ Section naming: a section that only lists links is `## Related`; a section that 
 
 ### Index and Log
 
-`wiki/index.md`: add the new page under its category (link + one-line description). Index only wiki-layer output (concepts/, summaries/, entities/), never refs/, scripts/, utils/, or other non-wiki content.
+`wiki/index.md`: add the new page under its category (link + one-line description). Index only wiki-layer output (concepts/, summaries/, entities/), never sources/, scripts/, utils/, or other non-wiki content.
 
 `wiki/log.md`: maintenance record, format `## [YYYY-MM-DD] ingest | Source title`, body naming the source path, pages created or updated, and key connections.

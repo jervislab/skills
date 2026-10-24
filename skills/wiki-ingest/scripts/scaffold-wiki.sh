@@ -12,7 +12,7 @@ BASE="${1:?Usage: scaffold-wiki.sh <base_path> <domain>}"
 DOMAIN="${2:?Missing domain}"
 DATE=$(date +%Y-%m-%d)
 
-mkdir -p "$BASE"/{refs,wiki/{concepts,summaries,entities}}
+mkdir -p "$BASE"/{sources,wiki/{concepts,summaries,entities}}
 
 # .claude/skills — skip if it already exists
 if [ ! -d "$BASE/.claude/skills" ]; then

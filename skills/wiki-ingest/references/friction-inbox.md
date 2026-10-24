@@ -2,7 +2,7 @@
 
 Goal: understand the user's goal, not remember the incident. Consolidation turns that goal into structure every later agent meets.
 
-Root `inbox.md` is the friction ledger, unrelated to `refs/inbox.md` (the URL queue). The recording rule lives in project-root AGENTS.md so it holds without this skill loaded.
+Root `inbox.md` is the friction ledger, unrelated to `sources/inbox.md` (the URL queue). The recording rule lives in project-root AGENTS.md so it holds without this skill loaded.
 
 ## Record
 

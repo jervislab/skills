@@ -2,7 +2,7 @@
 
 Build an LLM Wiki from scratch.
 
-An LLM Wiki is a two-layer system: the skill layer encodes capabilities the agent can execute, and the wiki layer encodes a knowledge network it can query. The two connect through `[[wiki-link]]`, rest on refs/ (immutable source material), and glossary.md keeps entropy in check.
+An LLM Wiki is a two-layer system: the skill layer encodes capabilities the agent can execute, and the wiki layer encodes a knowledge network it can query. The two connect through `[[wiki-link]]`, rest on sources/ (immutable raw material), and glossary.md keeps entropy in check.
 
 ## Phase 0: Ask
 
@@ -25,10 +25,10 @@ The script creates the base structure:
 
 ```
 <base_path>/
-├── refs/                  # immutable source layer
+├── sources/               # immutable raw layer
 ├── wiki/
 │   ├── concepts/          # reusable frameworks, decision models
-│   ├── summaries/         # source summaries (each bound to one ref)
+│   ├── summaries/         # source summaries (each bound to one source)
 │   └── entities/          # people, products, organizations
 ├── wiki/index.md          # entry point for locating knowledge
 ├── wiki/log.md            # operation log
@@ -52,7 +52,7 @@ After the script finishes, the agent initializes the system:
 
 3. Sort assets: scan the paths the user named in the asset inventory and route each asset by its nature:
    - Executable prompts, workflows, or SOPs → assess whether each deserves its own skill
-   - Methodology and reference documents → copy to refs/
+   - Methodology and reference documents → copy to sources/
    - Executable scripts → scripts/; reusable templates and tool configs → utils/ (create on demand)
    - List a suggested ingest order (foundational, highly connected material first)
 

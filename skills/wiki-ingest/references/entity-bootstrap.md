@@ -16,7 +16,7 @@ Record the generating structure, not what it generates. Each schema field is fue
 
 Depth audit: before writing an entry, ask two questions. (1) Can it be stated one layer deeper? If so, the current statement is surface; rewrite it at the deeper layer. (2) Could it be derived from other fields if deleted? If so, leave it out. An entry that fails the audit is rewritten or removed.
 
-Write test: does the signal change how an agent will reason when it later consumes this entity page? Only signals that do are worth writing; the rest stay in the raw material in refs/ for lookup on demand.
+Write test: does the signal change how an agent will reason when it later consumes this entity page? Only signals that do are worth writing; the rest stay in the raw material in sources/ for lookup on demand.
 
 ## Ask Flow
 

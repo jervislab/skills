@@ -59,7 +59,7 @@ LAYOUT = [
     {"name": "AGENTS.md", "kind": "file", "aliases": ["CLAUDE.md"]},
     {"name": "glossary.md", "kind": "file"},
     {"name": "inbox.md", "kind": "file"},
-    {"name": "refs", "kind": "directory", "expand": True},
+    {"name": "sources", "kind": "directory", "expand": True},
     {"name": ".git", "kind": "directory", "repository": True},
     {
         "name": "wiki",
@@ -262,7 +262,7 @@ DESIGN_SLOT = "DESIGN.md"
 DESIGN_MARK = metadata_mark("role", "design-system")
 DESIGN_DEPTH = 2
 # Folders that hold sources or know-how, never the design system itself
-DESIGN_SKIP = {"node_modules", "refs", "wiki"}
+DESIGN_SKIP = {"node_modules", "sources", "wiki"}
 
 
 # The marked page nearest the root, by name within a level, so this sync and

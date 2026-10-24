@@ -74,9 +74,9 @@ def rank(rel: str):
 def nearness(source_rel: str):
     """同名候选按「离来源多近」排序——共享的目录层级越多越近，同目录 > 父目录 > 更远。
 
-    这是 Obsidian 的规则，也是本仓库唯一正确的那个。refs/ 与 wiki/ 天然同名：
-    wiki-ingest 按 ref 命名产出页面，于是每消费一篇素材就多一对。若按路径最浅取舍，
-    refs/ 只有一层，永远赢——知识网络的边就全画进了原料层，而编辑器里看着一切正常。
+    这是 Obsidian 的规则，也是本仓库唯一正确的那个。sources/ 与 wiki/ 天然同名：
+    wiki-ingest 按素材命名产出页面，于是每消费一篇素材就多一对。若按路径最浅取舍，
+    sources/ 只有一层，永远赢——知识网络的边就全画进了原料层，而编辑器里看着一切正常。
     距离只在平手时才退回 rank()。"""
     src = Path(source_rel).parent.parts
 

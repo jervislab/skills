@@ -5,15 +5,15 @@ description: Ingest source material into the agent-maintained wiki layer. Single
 
 ## Gotchas
 
-A wiki page's `source:` frontmatter points to its raw material in refs/, the source of truth. Before bootstrap or the first ingest, help the user inventory the material already on hand and gather it into refs/, then start producing pages. Pages produced without this step end up with broken source links or sources that must be tracked down again and again.
+A wiki page's `source:` frontmatter points to its raw material in sources/, the source of truth. Before bootstrap or the first ingest, help the user inventory the material already on hand and gather it into sources/, then start producing pages. Pages produced without this step end up with broken source links or sources that must be tracked down again and again.
 
-Skipping the summary page and jumping directly to concept pages is the most common failure. Every ref-source ingest produces a summary page. Concept pages extract frameworks from the summary; without it, concepts lose grounding.
+Skipping the summary page and jumping directly to concept pages is the most common failure. Every ingest from sources/ produces a summary page. Concept pages extract frameworks from the summary; without it, concepts lose grounding.
 
 Discussion insights need explicit capture. A reframing or connection the user surfaces during Discuss must land somewhere — usually a concept page linked from the summary.
 
 A page's title lives only in the frontmatter `name`; the body opens with `## Overview` and carries no `# heading`. `description` and the index.md description column share one source — `name: description` concatenated is the index entry, so an edit to either must be mirrored in the other.
 
-index.md only indexes wiki-layer output (concepts/, summaries/, entities/). Never add refs/, scripts/, utils/, or other non-wiki files to the index. Raw source provenance is already tracked by each wiki page's `source:` frontmatter.
+index.md only indexes wiki-layer output (concepts/, summaries/, entities/). Never add sources/, scripts/, utils/, or other non-wiki files to the index. Raw source provenance is already tracked by each wiki page's `source:` frontmatter.
 
 The deep work of absorption — reading, judging, connecting — belongs to the human; the agent assists by structuring it and writing it to disk. Skipping Discuss and going straight to Execute outsources cognition to the agent and defeats the purpose of ingest.
 
@@ -101,16 +101,16 @@ metadata:
   role: design-system
 ```
 
-Only when the root holds neither does `sync.py` look for the mark, two folders deep at most, skipping hidden folders, `node_modules`, `wiki/`, and `refs/`; the shallowest marked `.md` wins, first by name within a level. Mark one page per vault: the spec the user's agent reads before designing a surface, not a token file or a component sheet beside it.
+Only when the root holds neither does `sync.py` look for the mark, two folders deep at most, skipping hidden folders, `node_modules`, `wiki/`, and `sources/`; the shallowest marked `.md` wins, first by name within a level. Mark one page per vault: the spec the user's agent reads before designing a surface, not a token file or a component sheet beside it.
 
 ## Source Routing
 
 | Input | First Step |
 |-------|------------|
-| refs/ path | Read directly |
+| sources/ path | Read directly |
 | root `inbox.md` | Friction mode; never read it as source material |
-| Other file path | Copy to refs/, then read |
-| URL | Fetch → save to refs/, then read |
-| Conversation text | Save to refs/ with descriptive filename, then read |
+| Other file path | Copy to sources/, then read |
+| URL | Fetch → save to sources/, then read |
+| Conversation text | Save to sources/ with descriptive filename, then read |
 
-All sources land in refs/ before processing.
+All sources land in sources/ before processing.
