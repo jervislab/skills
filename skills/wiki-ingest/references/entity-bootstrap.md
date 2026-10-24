@@ -88,7 +88,7 @@ vision and current stage.
 
 ## Related
 
-[[wiki-link]] to related pages in the wiki.
+`[[wiki-link]]` to related pages in the wiki.
 ```
 
 ## Working with wiki-ingest
