@@ -10,10 +10,10 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-# archive/archives 是已被取代的旧稿：留在图里会把过时的页面画成活节点，
+# archive/ 是已被取代的旧稿：留在图里会把过时的页面画成活节点，
 # 还会让退役的链接继续参与枢纽计数
 SKIP_DIRS = {".git", ".obsidian", "node_modules", ".venv", "venv", "__pycache__",
-             ".trash", ".idea", ".vscode", "dist", "build", "archive", "archives",
+             ".trash", ".idea", ".vscode", "dist", "build", "archive",
              ".wrangler", ".next", ".cache"}
 
 FENCE_RE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
