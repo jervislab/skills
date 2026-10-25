@@ -5,8 +5,12 @@ runs, every command is a silent no-op and nothing leaves the machine.
 What is sent: the vault's name and path, and its structure tree (file and
 folder names, paths, and whether each is missing, a skeleton, or filled),
 with each page's frontmatter `name` and `description` and the paths of the
-pages it links to and from. Page bodies are never read into the report, only
-used locally to judge fill, orphans, and links.
+pages it links to and from. With it go health counts: the repository's backup
+state, the friction inbox's size, the size of what the agent loads every
+session, the orphan and design-system readings the tree holds, and the
+judgments the user's agent wrote to health-audit.md, as rule, path, and date
+only. Page bodies are never read into the report, only used
+locally to judge fill, orphans, links, and what changed since an audit.
 
     python3 scripts/sync.py connect <endpoint> <token>   save credentials, report once
     python3 scripts/sync.py push [vault_dir]             report a vault (default: cwd)
@@ -445,6 +449,174 @@ def mark_pages(nodes, orphans, meta, links):
     return nodes
 
 
+# Health. What can be counted is counted here; what needs a page read, such
+# as whether a page has rotted, is judged by the user's agent and written to
+# health-audit.md, which this only reads. The Dashboard's Health applies the
+# thresholds; this reports the numbers.
+
+def git(vault: Path, *args) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(vault), *args],
+            capture_output=True, text=True, timeout=TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+# Work that would be lost with the machine: nothing committed, nothing pushed
+def backup_of(vault: Path) -> dict:
+    if git(vault, "rev-parse", "--git-dir") is None:
+        return {"repository": False}
+    last = (git(vault, "log", "-1", "--format=%ct") or "").strip()
+    # No upstream branch: nothing is tracked remotely, so nothing counts as pushed
+    unpushed = git(vault, "rev-list", "--count", "@{upstream}..HEAD")
+    status = git(vault, "status", "--porcelain") or ""
+    return {
+        "repository": True,
+        "remote": bool((git(vault, "remote") or "").strip()),
+        "unpushed": int(unpushed) if unpushed else None,
+        "uncommitted": len(status.splitlines()),
+        "lastCommitAt": int(last) if last else None,
+    }
+
+
+INBOX_ENTRY = re.compile(r"^- \[\d{4}-\d{2}-\d{2}\]")
+INBOX_REPEAT = re.compile(r"×\s*(\d+)\s*$")
+
+
+# Friction waiting to be consolidated, and how much of it has come back
+def inbox_of(vault: Path) -> dict | None:
+    inbox = vault / "inbox.md"
+    if not inbox.is_file():
+        return None
+    entries = [line for line in inbox.read_text(encoding="utf-8", errors="replace").splitlines()
+               if INBOX_ENTRY.match(line)]
+    repeated = [line for line in entries
+                if (count := INBOX_REPEAT.search(line)) and int(count.group(1)) >= 2]
+    return {"open": len(entries), "repeated": len(repeated)}
+
+
+# What the agent reads before every session: AGENTS.md and CLAUDE.md, with the
+# files they pull in by @path, as Claude Code does, a few levels deep
+RESIDENT = ["AGENTS.md", "CLAUDE.md"]
+RESIDENT_IMPORT = re.compile(r"(?:^|\s)@([\w./-]+\.md)\b")
+RESIDENT_DEPTH = 4
+RESIDENT_FILE_BUDGET = 8_000
+SKILL_BUDGET_LINES = 500
+
+
+def resident_of(vault: Path) -> list[Path]:
+    found, queue = [], [(vault / name, 0) for name in RESIDENT]
+    while queue:
+        page, depth = queue.pop(0)
+        page = page.resolve()
+        if page in found or not page.is_file() or vault.resolve() not in page.parents:
+            continue
+        found.append(page)
+        if depth < RESIDENT_DEPTH:
+            text = page.read_text(encoding="utf-8", errors="replace")
+            queue += [(page.parent / match, depth + 1) for match in RESIDENT_IMPORT.findall(text)]
+    return found
+
+
+# The size of what loads every session, and the agent-facing pages past their
+# budget: a resident file over its size, or a skill the user made over its
+# length, since only the user's own skills are theirs to compress
+def bloat_of(vault: Path, nodes) -> dict:
+    root = vault.resolve()
+    resident = resident_of(vault)
+    over = [page.relative_to(root).as_posix() for page in resident
+            if page.stat().st_size > RESIDENT_FILE_BUDGET]
+    skills = next((node for node in nodes if node.get("slot", node["id"]) == SKILLS_SLOT), None)
+    for skill in (skills or {}).get("children", []):
+        page = vault / skill["id"] / "SKILL.md"
+        if skill.get("own") and page.is_file():
+            lines = page.read_text(encoding="utf-8", errors="replace").count("\n")
+            if lines > SKILL_BUDGET_LINES:
+                over.append(f"{skill['id']}/SKILL.md")
+    return {
+        "residentBytes": sum(page.stat().st_size for page in resident),
+        "residentFiles": [page.relative_to(root).as_posix() for page in resident],
+        "overBudget": over,
+    }
+
+
+# The audit ledger the user's agent keeps at the vault root. One section per
+# audit, one line per open finding; the note after the date stays here:
+#   ## rot · 2026-10-25 · wiki/
+#   - wiki/concepts/pricing.md · rot · 2026-10-25 · note
+AUDIT_FILE = "health-audit.md"
+AUDIT_HEADING = re.compile(r"^## (rot|voice) · (\d{4}-\d{2}-\d{2}) · (.+?)\s*$")
+AUDIT_FINDING = re.compile(r"^- (.+?) · (rot|voice) · (\d{4}-\d{2}-\d{2})(?: · .*)?$")
+
+
+# Paths changed after a day: committed since, or not yet committed. Without a
+# repository the file's own time stands in.
+def changed_after(vault: Path, day: str, paths: list[str]) -> set:
+    log = git(vault, "log", f"--since={day} 23:59:59", "--name-only", "--format=")
+    if log is None:
+        end = time.mktime(time.strptime(day, "%Y-%m-%d")) + 86400
+        return {path for path in paths if (vault / path).exists() and (vault / path).stat().st_mtime >= end}
+    status = git(vault, "status", "--porcelain") or ""
+    uncommitted = {line[3:].strip().strip('"') for line in status.splitlines()}
+    return {line.strip() for line in log.splitlines() if line.strip()} | uncommitted
+
+
+def in_scope(path: str, scope: str) -> bool:
+    scope = scope.strip().rstrip("/")
+    return scope in ("", ".") or path == scope or path.startswith(scope + "/")
+
+
+def audit_of(vault: Path) -> dict | None:
+    ledger = vault / AUDIT_FILE
+    if not ledger.is_file():
+        return None
+    audits, findings = [], []
+    for line in ledger.read_text(encoding="utf-8", errors="replace").splitlines():
+        if heading := AUDIT_HEADING.match(line):
+            rule, day, scope = heading.groups()
+            audits.append({"rule": rule, "date": day, "scope": scope})
+        elif finding := AUDIT_FINDING.match(line):
+            path, rule, day = finding.groups()
+            findings.append({"path": path.strip(), "rule": rule, "date": day})
+    pages = [rel.as_posix() for _, rel in walk_docs(vault, [], True)]
+    for audit in audits:
+        changed = changed_after(vault, audit["date"], pages)
+        audit["changedSince"] = sum(
+            1 for path in changed if path.endswith(".md") and in_scope(path, audit["scope"]))
+    for finding in findings:
+        finding["stale"] = finding["path"] in changed_after(vault, finding["date"], [finding["path"]])
+    return {"audits": audits, "findings": findings}
+
+
+# Readings the tree already holds, kept with the rest so each has a history
+def structure_of(nodes) -> dict:
+    def walk(list_):
+        for node in list_:
+            yield node
+            yield from walk(node.get("children", []))
+
+    flat = list(walk(nodes))
+    design = next((node for node in nodes if node.get("slot", node["id"]) == DESIGN_SLOT), None)
+    return {
+        "orphans": sum(1 for node in flat if node.get("orphan")),
+        "design": "present" if design and design["state"] != "missing"
+        else "candidate" if design and design.get("candidate") else "missing",
+    }
+
+
+def health_of(vault: Path, nodes) -> dict:
+    return {
+        "backup": backup_of(vault),
+        "inbox": inbox_of(vault),
+        "bloat": bloat_of(vault, nodes),
+        "audit": audit_of(vault),
+        "structure": structure_of(nodes),
+    }
+
+
 def display_path(vault: Path) -> str:
     try:
         return "~/" + str(vault.relative_to(Path.home()))
@@ -482,6 +654,7 @@ def report_of(vault: Path) -> dict:
     return {
         "vault": {"name": vault.name, "path": root, "absolutePath": str(vault)},
         "tree": tree,
+        "health": health_of(vault, tree),
     }
 
 

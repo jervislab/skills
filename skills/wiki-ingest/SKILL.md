@@ -1,6 +1,6 @@
 ---
 name: wiki-ingest
-description: Ingest source material into the agent-maintained wiki layer. Single mode consumes one source with deep Discuss; Friction consolidates the root inbox.md friction ledger into skill Gotchas, AGENTS.md, or scripts; Lint checks link integrity and page conventions across the wiki.
+description: Ingest source material into the agent-maintained wiki layer. Single mode consumes one source with deep Discuss; Friction consolidates the root inbox.md friction ledger into skill Gotchas, AGENTS.md, or scripts; Lint checks link integrity and page conventions across the wiki, and records what only a reading can judge, such as rot, in health-audit.md.
 ---
 
 ## Gotchas
@@ -73,11 +73,11 @@ Recording criteria and the consolidation flow live in `references/friction-inbox
 
 Guards against wiki rot at edit time, not in a later cleanup. `scripts/wiki-lint.py` runs the quick mechanical pass; its docstring carries usage, and `scripts/scaffold-wiki.sh` wires it into a PostToolUse hook.
 
-On invocation, run `--all` and fix what it reports. Then surface what no script can judge — stale claims, `[[concept]]` pages that should exist, fillable data gaps — as a list for the user to decide.
+On invocation, run `--all` and fix what it reports. Then judge what no script can. Rot and voice are health findings: fix what is clear, ask the user where it is not, and record what stays open in the vault-root ledger `health-audit.md`, per `references/health-audit.md`. A JERVIS handoff that asks for an audit names the rule and the scope. `[[concept]]` pages that should exist and fillable data gaps stay a list for the user to decide.
 
 ## JERVIS Sync
 
-Optional. `scripts/sync.py` reports the vault's structure to a JERVIS Dashboard: the vault's name and path, and a tree of file and folder names with each one's fill state, each page's frontmatter `name` and `description`, and the paths of the pages it links to and from. Page bodies never leave the machine. Until `sync.py connect <endpoint> <token>` has run, every sync command is a silent no-op. A git worktree is never reported: it is a branch of the vault, and the main checkout speaks for it.
+Optional. `scripts/sync.py` reports the vault's structure to a JERVIS Dashboard: the vault's name and path, and a tree of file and folder names with each one's fill state, each page's frontmatter `name` and `description`, and the paths of the pages it links to and from. With it go health counts: whether the vault is committed and pushed, how many inbox entries wait and how many recur, how large AGENTS.md and CLAUDE.md load with what they import, and the audits and open findings in `health-audit.md` by rule, path, and date. A finding's note stays on the machine, and so do page bodies. Until `sync.py connect <endpoint> <token>` has run, every sync command is a silent no-op. A git worktree is never reported: it is a branch of the vault, and the main checkout speaks for it.
 
 Scaffold wires `sync.py --hook` beside wiki-lint, into PostToolUse for every tool that can change files (shell included) and into UserPromptSubmit, which brings in edits the user made in their editor, then reports once. A vault scaffolded before that has neither: once connected, add the same hook entry to its `.claude/settings.json` (the shape scaffold-wiki.sh writes), then run `sync.py push <vault>` once.
 
