@@ -62,6 +62,7 @@ TIMEOUT_SECONDS = 5
 #   shallow     list what is directly inside, each entry read as a whole
 #   candidate   where an unmarked design system may sit, reported on the
 #               missing slot
+#   pages       list markdown pages only, at every depth below
 LAYOUT = [
     {"name": "AGENTS.md", "kind": "file", "aliases": ["CLAUDE.md"]},
     {"name": "glossary.md", "kind": "file"},
@@ -72,6 +73,9 @@ LAYOUT = [
         "name": "wiki",
         "kind": "directory",
         "expand": True,
+        # The agent writes every wiki page as markdown; anything else here is an
+        # attachment or misplaced, and would fill a folder that holds no page
+        "pages": True,
         "children": [
             {"name": "concepts", "kind": "directory"},
             {"name": "entities", "kind": "directory"},
@@ -132,27 +136,33 @@ def repository_state(entry: Path) -> str:
 # Must match the Dashboard's browser scan.
 IMAGE_FOLDERS = {"image", "images"}
 IMAGE_FILE = re.compile(r"\.(?:png|jpe?g|gif|webp|avif|heic|bmp|ico|tiff?|svgz?)$", re.I)
+# Build output and installed dependencies are no one's know-how, wherever they
+# sit. Must match the Dashboard's browser scan.
+CACHE_FOLDERS = {"__pycache__", "node_modules"}
+CACHE_FILE = re.compile(r"\.pyc$", re.I)
 
 
-def is_listed(entry: Path) -> bool:
+def is_listed(entry: Path, pages: bool = False) -> bool:
     if entry.name.startswith("."):
         return False
     if entry.is_dir():
-        return entry.name.lower() not in IMAGE_FOLDERS
-    return not IMAGE_FILE.search(entry.name)
+        return entry.name.lower() not in IMAGE_FOLDERS and entry.name not in CACHE_FOLDERS
+    if pages:
+        return entry.name.endswith(".md")
+    return not (IMAGE_FILE.search(entry.name) or CACHE_FILE.search(entry.name))
 
 
-def visible(directory: Path):
-    return [entry for entry in directory.iterdir() if is_listed(entry)]
+def visible(directory: Path, pages: bool = False):
+    return [entry for entry in directory.iterdir() if is_listed(entry, pages)]
 
 
 # A directory is filled once anything inside it is
-def holds_content(directory: Path) -> bool:
-    for entry in visible(directory):
+def holds_content(directory: Path, pages: bool = False) -> bool:
+    for entry in visible(directory, pages):
         if entry.is_file():
             if file_state(entry) == "filled":
                 return True
-        elif entry.is_dir() and holds_content(entry):
+        elif entry.is_dir() and holds_content(entry, pages):
             return True
     return False
 
@@ -166,8 +176,8 @@ def locate(directory, present, path):
     return entry if entry and entry.exists() else None
 
 
-def scan_level(directory, expected, list_all, parent_id, root, descend=True):
-    present = {entry.name: entry for entry in visible(directory)} if directory else {}
+def scan_level(directory, expected, list_all, parent_id, root, descend=True, pages=False):
+    present = {entry.name: entry for entry in visible(directory, pages)} if directory else {}
     specs = {spec["name"]: spec for spec in expected}
     if list_all:
         for name, entry in present.items():
@@ -191,6 +201,7 @@ def scan_level(directory, expected, list_all, parent_id, root, descend=True):
         # by a folder, as a design system is
         if entry.is_dir() if entry else spec["kind"] == "directory":
             node["folder"] = True
+        pages_below = pages or spec.get("pages", False)
         if entry is None:
             if spec.get("candidate"):
                 node["candidate"] = spec["candidate"]
@@ -200,10 +211,16 @@ def scan_level(directory, expected, list_all, parent_id, root, descend=True):
         elif entry.is_file():
             nodes.append({**node, "state": file_state(entry)})
         elif not (spec.get("expand") or spec.get("shallow") or (list_all and descend)):
-            nodes.append({**node, "state": "filled" if holds_content(entry) else "skeleton"})
+            nodes.append({**node, "state": "filled" if holds_content(entry, pages_below) else "skeleton"})
         else:
             children = scan_level(
-                entry, spec.get("children", []), True, node_id, root, descend=not spec.get("shallow")
+                entry,
+                spec.get("children", []),
+                True,
+                node_id,
+                root,
+                descend=not spec.get("shallow"),
+                pages=pages_below,
             )
             node["state"] = "filled" if any(c["state"] == "filled" for c in children) else "skeleton"
             if children:
