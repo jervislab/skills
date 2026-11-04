@@ -1,15 +1,13 @@
 ## gotchas
 
-- Write every intermediate artifact as a local md file
+- Maintain one durable master document per proposal or stage deliverable, updating its state, decisions, essential evidence, and open questions as it grows toward delivery; resume from it across sessions.
 - When a global concept is easy to confuse, confirm it with the user, then add it to glossary.md
 - Retrieve first; wisdom accumulated in the wiki serves as reference
-- Wiki Layer: sources/ (raw material, landed as-is) → wiki/ (knowledge output maintained by the agent) → AGENTS.md (schema).
+- Wiki Layer: durable source documents (sources/ or the owning project location) → wiki/ (knowledge output maintained by the agent) → AGENTS.md (schema).
 
 ### Ingest
 
-Land all external material in sources/ before triage; skip no step.
-
-Step 1: Fetch — capture as md and save to sources/. sources/ is the raw layer.
+Step 1: Persist — use the task's existing master document in its owning project location; use sources/ when it has no established home. Keep tool responses, repeated checks, and diffs in memory or temporary storage, and write decision-relevant results into the master document. Capture URL originals in sources/ when selected for absorption. Maintaining the manuscript does not itself trigger wiki ingestion.
 
 Step 2: Triage — after reading the full text, judge signal density and destination:
 - → reference: contains a reusable principle / method; absorb into the target skill's references/. Follow `references/absorb-to-reference.md`.
@@ -29,7 +27,7 @@ Each wiki edit lints the edited page; fix what it reports in the same change. A 
 
 ### Page Conventions
 
-Frontmatter has four fields in fixed order: `name` (title, conclusion-style preferred), `description` (one-line retrieval hook, not repeating name), `source` (sources/ path or `user input`), `last_updated`. `index.md`, `overview.md`, and `log.md` carry the first two plus `last_updated`.
+Frontmatter has four fields in fixed order: `name` (title, conclusion-style preferred), `description` (one-line retrieval hook, not repeating name), `source` (canonical source document path or `user input`), `last_updated`. `index.md`, `overview.md`, and `log.md` carry the first two plus `last_updated`.
 
 The title lives only in frontmatter; the body has no `# heading`, and the first section is always `## Overview`. Directory path is the type (concepts/, entities/, summaries/). Language: wiki pages follow the user's language; filenames are English kebab-case. A section that only lists links is `## Related`; a section that explains in prose how a concept differs from and complements its neighbors is `## Adjacent Concepts`. Cross-reference with `[[wiki-link]]`. Project-specific terms are defined once in the root `glossary.md`; pages reference them without re-explaining. References run one way, wiki → skill; skills do not depend on the wiki, and the reference is cut after absorb.
 

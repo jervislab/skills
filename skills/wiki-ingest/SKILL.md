@@ -5,9 +5,11 @@ description: Ingest source material into the agent-maintained wiki layer. Single
 
 ## Gotchas
 
-A wiki page's `source:` frontmatter points to its raw material in sources/, the source of truth. Before bootstrap or the first ingest, help the user inventory the material already on hand and gather it into sources/, then start producing pages. Pages produced without this step end up with broken source links or sources that must be tracked down again and again.
+Grow each proposal or stage deliverable in one durable master document as the task converges toward delivery. Preserve its current state, decisions, essential evidence, and open questions so work can resume after the conversation is lost. Use the project's existing artifact location; use sources/ when the document has no established home.
 
-Skipping the summary page and jumping directly to concept pages is the most common failure. Every ingest from sources/ produces a summary page. Concept pages extract frameworks from the summary; without it, concepts lose grounding.
+Keep tool responses, repeated checks, and diffs in execution memory or temporary storage; carry decision-relevant results into the master document. A wiki page's `source:` points to that canonical document or the original selected for absorption.
+
+Skipping the summary page and jumping directly to concept pages is the most common failure. Every selected document ingested into the wiki produces a summary page. Concept pages extract frameworks from the summary; without it, concepts lose grounding.
 
 Discussion insights need explicit capture. A reframing or connection the user surfaces during Discuss must land somewhere — usually a concept page linked from the summary.
 
@@ -109,8 +111,8 @@ Only when the root holds neither does `sync.py` look for the mark, two folders d
 |-------|------------|
 | sources/ path | Read directly |
 | root `inbox.md` | Friction mode; never read it as source material |
-| Other file path | Copy to sources/, then read |
-| URL | Fetch → save to sources/, then read |
-| Conversation text | Save to sources/ with descriptive filename, then read |
+| Other file path | Read the canonical document in place |
+| URL selected for absorption | Capture the original in sources/, then read |
+| Conversation text selected for absorption | Distill it into the task's master document, then read |
 
-All sources land in sources/ before processing.
+Apply this routing when material is selected for absorption. Maintaining a task manuscript does not automatically trigger wiki ingestion.

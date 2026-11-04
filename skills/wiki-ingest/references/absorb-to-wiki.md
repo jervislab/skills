@@ -4,11 +4,11 @@ Read one source and absorb it into wiki knowledge pages. Complements absorb-to-r
 
 ## Principle
 
-Wisdom is subtraction: extract transferable frameworks and mindsets. The wiki holds only the judgments and connections taken out of the source; the argument stays in sources/. Cases, analogies, worked numbers, and anecdotes in the source are the author's argument — write the rule they support, or drop them. Cases the user brings from their own experience during Discuss are user input and may stay.
+Wisdom is subtraction: extract transferable frameworks and mindsets. The wiki holds only the judgments and connections taken out of the source; the argument stays in the canonical source document. Cases, analogies, worked numbers, and anecdotes in the source are the author's argument — write the rule they support, or drop them. Cases the user brings from their own experience during Discuss are user input and may stay.
 
 ## Three-layer architecture
 
-sources/ (raw, source of truth) → wiki/ (agent-maintained processing layer) → AGENTS.md Wiki Layer (schema).
+Durable source documents (task manuscripts and selected originals) → wiki/ (agent-maintained processing layer) → AGENTS.md Wiki Layer (schema). sources/ holds documents without another established project location; existing master documents remain in place.
 
 ## Workflow
 
@@ -36,7 +36,7 @@ Output has two layers. The summary page (`wiki/summaries/`) holds the source's f
 
 ### Source attribution
 
-A summaries/ page binds to a single source and holds only that source's knowledge. Knowledge from outside sources/ (user plans, original judgments) gets its own concept page, linked via `[[wiki-link]]`, and stays out of the summary page.
+A summaries/ page binds to a single source and holds only that source's knowledge. Knowledge introduced outside the selected source document gets its own concept page, linked via `[[wiki-link]]`, and stays out of the summary page.
 
 ### 5. Fuse
 
@@ -60,7 +60,7 @@ Frontmatter:
 ---
 name: Page title, conclusion-first
 description: One-line summary of mechanism or content, not repeating what name already says
-source: sources/<file>
+source: <canonical source document path>
 last_updated: YYYY-MM-DD
 ---
 ```
@@ -69,9 +69,9 @@ last_updated: YYYY-MM-DD
 
 `description` is the agent's retrieval hook: grepping frontmatter across the repo yields the knowledge map, so it states the mechanism or content in one line without repeating characters from name. `name: description` concatenated is the description column of `wiki/index.md`; the two share one source.
 
-`source` points to the raw file path in sources/. Metadata such as url and author live only in the sources/ file. Knowledge from user conversation = `source: user input`.
+`source` points to the canonical source document, whether it lives in sources/ or its established project location. Metadata such as url and author live in that source document. Knowledge captured directly from user discussion = `source: user input`.
 
-When sources/ holds no original link (the source is a periodical excerpt, or lives outside sources/), append it: `source: xxx · https://xxx`. No separate `url` field, no markdown link.
+When the source document holds no original link and an original URL is needed for attribution, append it: `source: xxx · https://xxx`. No separate `url` field, no markdown link.
 
 Quote a YAML value as a whole when it starts with `[ { & * ! | > % @` or a quote mark.
 
