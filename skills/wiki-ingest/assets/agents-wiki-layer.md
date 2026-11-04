@@ -13,13 +13,13 @@ Step 2: Triage — after reading the full text, judge signal density and destina
 - → reference: contains a reusable principle / method; absorb into the target skill's references/. Follow `references/absorb-to-reference.md`.
 - → wiki: contains narrative, argument chains, or entity information; trigger the `wiki-ingest` skill to produce wiki pages.
 - → skill: contains a methodology that can be encoded as an agent capability; go through the skill-creator flow.
-- → discard: signal density too low; delete from sources/.
+- → discard: skip knowledge output when reusable signal is insufficient; retain active task manuscripts, deliverables, and referenced sources, removing only captures with no remaining use.
 
 Paths can run in parallel on the same material (one article can yield both a reference and a wiki page).
 
 ### Query
 
-Read `wiki/index.md` to locate → read the relevant pages, tracing back to sources/ when needed → synthesize the answer.
+Read `wiki/index.md` to locate → read the relevant pages, following `source:` to the canonical document when needed → synthesize the answer.
 
 ### Lint
 
