@@ -84,7 +84,6 @@ LAYOUT = [
             {"name": "concepts", "kind": "directory"},
             {"name": "entities", "kind": "directory"},
             {"name": "index.md", "kind": "file"},
-            {"name": "log.md", "kind": "file"},
             {"name": "overview.md", "kind": "file"},
             {"name": "summaries", "kind": "directory"},
         ],

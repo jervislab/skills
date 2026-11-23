@@ -31,14 +31,14 @@ The script creates the base structure:
 │   ├── summaries/         # source summaries (each bound to one source)
 │   └── entities/          # people, products, organizations
 ├── wiki/index.md          # entry point for locating knowledge
-├── wiki/log.md            # operation log
 ├── wiki/overview.md       # system overview (to be filled)
 ├── glossary.md            # global glossary: frontmatter only, its description sets the entry format; grows with each ingest
 ├── inbox.md               # friction ledger: agents write, humans consolidate, entries deleted once absorbed
 └── .claude/settings.json  # PostToolUse hook: runs wiki-lint on every wiki edit; skipped if already wired
 ```
 
-- Every page starts as frontmatter only: its description carries its purpose and entry format, so any body text is real content. Sections in index.md and entries in log.md appear with the first page and the first operation.
+- Every page starts as frontmatter only: its description carries its purpose and entry format, so any body text is real content. Sections in index.md appear with the first page.
+- Change history belongs to git, not a separate wiki log file. Initialize git in the vault root if absent.
 - The script creates no skill directories. The agent builds them in Phase 2 as the capability plan from Ask requires.
 - The tool layer grows on demand, created with `mkdir -p` on first write: scripts start in `scripts/`, and templates and configs move into `utils/` only once there are enough to need grouping. Directories for the user's own habits (such as a personal drafts area) are theirs to create; the scaffold presets none.
 

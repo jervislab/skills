@@ -21,7 +21,7 @@ INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 LINK_RE = re.compile(r"!?\[\[([^\[\]\n]+?)\]\]")
 
 # 路由页只指路,没人链它是常态
-ROUTING = {"index.md", "overview.md", "log.md"}
+ROUTING = {"index.md", "overview.md"}
 # 图片提示词是资产不是知识页,不进链接图
 ASSET_DIRS = {"images"}
 

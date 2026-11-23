@@ -85,8 +85,6 @@ The first body section is always `## Overview`: one coherent paragraph stating t
 
 Section naming: a section that only lists links is `## Related`; a section that explains in prose how the page differs from and complements adjacent concepts is `## Adjacent Concepts`. Use one or the other, never both.
 
-### Index and Log
+### Index
 
 `wiki/index.md`: add the new page under its category (link + one-line description). Index only wiki-layer output (concepts/, summaries/, entities/), never sources/, scripts/, utils/, or other non-wiki content.
-
-`wiki/log.md`: maintenance record, format `## [YYYY-MM-DD] ingest | Source title`, body naming the source path, pages created or updated, and key connections.

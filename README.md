@@ -26,7 +26,6 @@ wiki/concepts/         transferable frameworks
 wiki/summaries/        one page per source
 wiki/entities/         people, products, organizations
 wiki/index.md          routing table
-wiki/log.md            ingest log
 wiki/overview.md       system overview
 glossary.md            project terms (skipped if present)
 inbox.md               friction ledger (skipped if present)

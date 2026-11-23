@@ -28,15 +28,6 @@ last_updated: $DATE
 ---
 INDEXEOF
 
-# log.md
-cat > "$BASE/wiki/log.md" << LOGEOF
----
-name: Wiki Log
-description: "Append-only ingest / create / update stream recording each absorption's source path, output pages, and key links; entries as \`## [YYYY-MM-DD] action | Title\`, action one of ingest, query, lint, create, update"
-last_updated: $DATE
----
-LOGEOF
-
 # overview.md
 cat > "$BASE/wiki/overview.md" << OVERVIEWEOF
 ---
@@ -102,4 +93,7 @@ HOOKEOF
 python3 "$SKILL_DIR/scripts/sync.py" push "$BASE" || true
 
 echo "Scaffolded LLM Wiki at $BASE"
+if [ ! -e "$BASE/.git" ]; then
+  echo "Tip: initialize git (git -C \"$BASE\" init) so commits track change history."
+fi
 echo "Next: fill overview.md, create entity page, sort assets, ingest first source."
